@@ -1,0 +1,45 @@
+{
+  "name": "prism-cli",
+  "version": "0.1.0",
+  "description": "Understand your codebase before you change it. Local-first CLI that indexes git history and code structure to explain why code exists and what a change will break.",
+  "type": "module",
+  "bin": {
+    "prism": "./dist/cli/index.js"
+  },
+  "main": "./dist/cli/index.js",
+  "types": "./dist/cli/index.d.ts",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "tsx src/cli/index.ts",
+    "build": "tsup src/cli/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.0",
+    "approve": "^0.0.12",
+    "better-sqlite3": "^11.10.0",
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "esbuild": "^0.28.2",
+    "scripts": "^0.1.0",
+    "ts-morph": "^23.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.14.0",
+    "tsup": "^8.2.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "better-sqlite3@11.10.0": true
+  }
+}
