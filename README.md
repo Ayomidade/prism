@@ -13,7 +13,9 @@ No code leaves your machine. No server, no account, no cloud dependency required
 
 ## Status
 
-🚧 Pre-implementation. This repo currently contains the full planning and architecture docs plus a scaffolded module structure. See `docs/` for the complete spec before writing any code.
+🚧 **Phase 1, Day 2 complete.** Git ingestion (log + blame) and the SQLite persistence layer are implemented and tested. The store layer (`db.ts`, `schema.ts`, `repository.ts`) is fully working with schema versioning and dedup. See `linking.md` for a detailed build log of what was done, bugs encountered, and lessons learned.
+
+**Next up:** Day 3 — AST parsing + code graph construction (`graph/parser.ts`, `graph/build-graph.ts`).
 
 ## Planning Docs
 
