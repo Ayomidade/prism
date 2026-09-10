@@ -33,7 +33,7 @@
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** Current schema version. Increment when DDL changes require a re-index. */
-export const SCHEMA_VERSION = "1";
+export const SCHEMA_VERSION = "2"; // was "1" — added unique index on files.path
 
 /**
  * Complete DDL for all PRISM tables.
@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS files (
   path TEXT NOT NULL,
   is_deleted BOOLEAN DEFAULT 0
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_files_path ON files(path);
 
 CREATE TABLE IF NOT EXISTS file_renames (
   id INTEGER PRIMARY KEY,
