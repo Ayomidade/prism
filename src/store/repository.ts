@@ -1,126 +1,85 @@
 import type Database from "better-sqlite3";
 
-// ──────────────────────────────────────────────────────────────────────────────
-// repository.ts — Read/write helpers for graph data
-// ──────────────────────────────────────────────────────────────────────────────
-//
-// This module is a thin data-access layer over the SQLite database. It keeps
-// raw SQL out of the ingestion/ and graph/ modules, so those layers work with
-// typed functions instead of writing SQL strings.
-//
-// Every function here corresponds to a single table insert operation. They
-// are called during `prism init` by the indexing pipeline (build-graph.ts)
-// and the git ingestion layer.
-//
-// Current state: all functions are stubbed (throw "not implemented yet").
-// These will be filled in as part of Day 1-3 of the build plan.
-//
-// Data flow:
-//
-//   ingestion/git/log.ts  ──► ParsedCommit[]
-//   ingestion/git/blame.ts ──► BlameLine[]
-//   graph/parser.ts       ──► ParsedFile[]
-//           │
-//           ▼
-//   graph/build-graph.ts  ──► calls repository.ts insert*() functions
-//           │
-//           ▼
-//   .prism/graph.db (via db.ts connection)
-//
-// See also: docs/prism-v1-build-spec.md Section 3 for the schema these
-// functions operate on, and Section 7 (steps 4-6) for how they're called.
-// ──────────────────────────────────────────────────────────────────────────────
+// Read/write helpers for graph data. Keeps raw SQL out of the graph/ and
+// ingestion/ layers. See docs/prism-v1-build-spec.md Section 3 for the schema
+// these methods operate on.
 
 /**
- * Inserts a file record into the `files` table.
- *
- * Called during init when a new source file is encountered. If the file
- * path already exists, this should either return the existing ID or
- * handle the duplicate gracefully (exact behavior TBD).
- *
- * @param db   - Open SQLite database connection
- * @param path - Relative path to the file (e.g. "src/foo.ts")
- * @returns The row ID of the inserted (or existing) file record
+ * Inserts a file by path, or returns the existing row's id if the path
+ * is already known. Atomic — relies on the unique index on files.path
+ * (schema v2) so re-indexing the same file across many commits doesn't
+ * create duplicate rows.
  */
-export function insertFile(_db: Database.Database, _path: string): number {
-  // TODO: INSERT INTO files (path) VALUES (?) RETURNING id
-  throw new Error("insertFile: not implemented yet");
+export function insertFile(db: Database.Database, path: string): number {
+  const row = db
+    .prepare(
+      `INSERT INTO files (path) VALUES (?)
+       ON CONFLICT(path) DO UPDATE SET path = excluded.path
+       RETURNING id`
+    )
+    .get(path) as { id: number };
+
+  return row.id;
 }
 
 /**
- * Inserts a symbol record (function, class, export, or variable) into the
- * `symbols` table.
- *
- * Symbols are extracted from the AST (via graph/parser.ts) and represent
- * the "nodes" in the dependency graph. Each symbol knows its file, name,
- * kind, and line range.
- *
- * @param db        - Open SQLite database connection
- * @param fileId    - The file ID this symbol belongs to (from insertFile)
- * @param name      - Symbol name (e.g. "getUserById")
- * @param kind      - One of: "function", "class", "export", "variable"
- * @param startLine - First line of the symbol definition
- * @param endLine   - Last line of the symbol definition
- * @returns The row ID of the inserted symbol record
+ * Inserts a symbol (function/class/export/variable) within a file.
+ * Not called anywhere yet — Day 3 (AST parsing) is what populates this.
+ * Implemented now for interface consistency; no dedup logic yet since
+ * re-indexing behavior for symbols/edges is a Day 3 concern (the AST
+ * pass will likely need to clear and rebuild a file's symbols wholesale
+ * rather than dedup row-by-row).
  */
 export function insertSymbol(
-  _db: Database.Database,
-  _fileId: number,
-  _name: string,
-  _kind: string,
-  _startLine: number,
-  _endLine: number,
+  db: Database.Database,
+  fileId: number,
+  name: string,
+  kind: string,
+  startLine: number,
+  endLine: number
 ): number {
-  // TODO: INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?) RETURNING id
-  throw new Error("insertSymbol: not implemented yet");
+  const row = db
+    .prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line)
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING id`
+    )
+    .get(fileId, name, kind, startLine, endLine) as { id: number };
+
+  return row.id;
 }
 
 /**
- * Inserts an edge record into the `edges` table.
- *
- * Edges represent dependency relationships between symbols:
- *   - "imports":  file A imports from file B
- *   - "calls":    function A calls function B
- *   - "extends":  class A extends class B
- *
- * The direction convention is: from_symbol → to_symbol means "from depends on to".
- * The `impact` command traverses edges in REVERSE to find who depends on a symbol.
- *
- * @param db            - Open SQLite database connection
- * @param fromSymbolId  - The dependent symbol (the one that imports/calls)
- * @param toSymbolId    - The dependency (the one being imported/called)
- * @param edgeType      - One of: "imports", "calls", "extends"
+ * Inserts a dependency edge between two symbols. Same Day-3-only caveat
+ * as insertSymbol above — not called yet.
  */
 export function insertEdge(
-  _db: Database.Database,
-  _fromSymbolId: number,
-  _toSymbolId: number,
-  _edgeType: string,
+  db: Database.Database,
+  fromSymbolId: number,
+  toSymbolId: number,
+  edgeType: string
 ): void {
-  // TODO: INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type) VALUES (?, ?, ?)
-  throw new Error("insertEdge: not implemented yet");
+  db.prepare(
+    `INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type)
+     VALUES (?, ?, ?)`
+  ).run(fromSymbolId, toSymbolId, edgeType);
 }
 
 /**
- * Inserts a commit record into the `commits` table.
- *
- * Commits are parsed from `git log` output (via ingestion/git/log.ts).
- * Each commit stores its SHA, author, date, and message — this is the
- * raw data that `prism why` queries to explain why code exists.
- *
- * @param db      - Open SQLite database connection
- * @param sha     - Full commit SHA (40 chars)
- * @param author  - Commit author name/email
- * @param date    - ISO 8601 timestamp
- * @param message - Full commit message (first line only or full body TBD)
+ * Inserts a commit. Uses INSERT OR IGNORE since the same commit SHA will
+ * be encountered once per file it touches during ingestion — sha is
+ * already the primary key (schema v1), so no schema change was needed
+ * here, unlike insertFile.
  */
 export function insertCommit(
-  _db: Database.Database,
-  _sha: string,
-  _author: string,
-  _date: string,
-  _message: string,
+  db: Database.Database,
+  sha: string,
+  author: string,
+  date: string,
+  message: string
 ): void {
-  // TODO: INSERT INTO commits (sha, author, date, message) VALUES (?, ?, ?, ?)
-  throw new Error("insertCommit: not implemented yet");
+  db.prepare(
+    `INSERT OR IGNORE INTO commits (sha, author, date, message)
+     VALUES (?, ?, ?, ?)`
+  ).run(sha, author, date, message);
 }
