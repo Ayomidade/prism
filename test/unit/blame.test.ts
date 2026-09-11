@@ -29,13 +29,13 @@ describe("parseGitBlame", () => {
   });
 
   it("maps all lines to the correct commit for single-commit files", async () => {
-    // schema.ts was created in one commit and mostly unchanged — but uncommitted
-    // edits show as SHA 00000000... in blame. Filter those out to test the
-    // committed lines only.
-    const result = await parseGitBlame(REPO_ROOT, "src/store/schema.ts");
-    const committed = result.filter((r) => !r.commitSha.startsWith("00000000"));
-    const shas = new Set(committed.map((r) => r.commitSha));
+    // db.ts was created in one commit (192550a4) and never modified after.
+    // Using this instead of schema.ts which has uncommitted edits that
+    // show as SHA 00000000 in blame output.
+    const result = await parseGitBlame(REPO_ROOT, "src/store/db.ts");
+    const shas = new Set(result.map((r) => r.commitSha));
     expect(shas.size).toBe(1);
+    expect(result.length).toBe(149);
   });
 
   it("returns [] for a nonexistent file", async () => {
