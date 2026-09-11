@@ -3,9 +3,9 @@ import { buildTemplateSummary, buildTemplateSummaryJson } from "../../src/summar
 import type { HistoryEntry } from "../../src/graph/query.js";
 
 const SAMPLE_HISTORY: HistoryEntry[] = [
-  { commitSha: "abc1234567890", message: "Add schema version check", date: "2026-09-10T09:00:00Z", author: "Alice" },
-  { commitSha: "def5678901234", message: "Refactor openDatabase\n\nMoved connection pooling to a separate function", date: "2026-09-05T14:30:00Z", author: "Bob" },
-  { commitSha: "ghi9012345678", message: "Initial implementation", date: "2026-09-01T10:00:00Z", author: "Alice" },
+  { commitSha: "abc1234567890", message: "Add schema version check", date: "2026-09-10T09:00:00Z", author: "Alice", prNumbers: [42], prTitles: ["Add schema validation"] },
+  { commitSha: "def5678901234", message: "Refactor openDatabase\n\nMoved connection pooling to a separate function", date: "2026-09-05T14:30:00Z", author: "Bob", prNumbers: [], prTitles: [] },
+  { commitSha: "ghi9012345678", message: "Initial implementation", date: "2026-09-01T10:00:00Z", author: "Alice", prNumbers: [], prTitles: [] },
 ];
 
 describe("buildTemplateSummary", () => {
@@ -40,6 +40,8 @@ describe("buildTemplateSummary", () => {
       message: `Commit ${i}`,
       date: `2026-09-${String(i + 1).padStart(2, "0")}T10:00:00Z`,
       author: "Test",
+      prNumbers: [],
+      prTitles: [],
     }));
 
     const result = buildTemplateSummary(manyCommits, "test");
@@ -49,6 +51,20 @@ describe("buildTemplateSummary", () => {
   it("uses function name as target", () => {
     const result = buildTemplateSummary(SAMPLE_HISTORY, "openDatabase");
     expect(result).toContain("Why does openDatabase exist?");
+  });
+
+  it("shows PR numbers and titles when available", () => {
+    const result = buildTemplateSummary(SAMPLE_HISTORY, "test");
+    expect(result).toContain("PR #42: Add schema validation");
+  });
+
+  it("shows PR number without title when title is missing", () => {
+    const historyWithPrNoTitle: HistoryEntry[] = [
+      { commitSha: "abc1234567890", message: "Fix bug", date: "2026-09-10T09:00:00Z", author: "Alice", prNumbers: [99], prTitles: [] },
+    ];
+    const result = buildTemplateSummary(historyWithPrNoTitle, "test");
+    expect(result).toContain("PR #99");
+    expect(result).not.toContain("PR #99:");
   });
 });
 

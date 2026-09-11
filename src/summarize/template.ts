@@ -36,6 +36,19 @@ export function buildTemplateSummary(
     const summary = entry.message.split("\n")[0];
     lines.push(`${date}  ${sha}  ${entry.author}`);
     lines.push(`  ${summary}`);
+
+    // Show linked PRs if available
+    if (entry.prNumbers.length > 0) {
+      for (let i = 0; i < entry.prNumbers.length; i++) {
+        const prNum = entry.prNumbers[i];
+        const prTitle = entry.prTitles[i];
+        if (prTitle) {
+          lines.push(`  PR #${prNum}: ${prTitle}`);
+        } else {
+          lines.push(`  PR #${prNum}`);
+        }
+      }
+    }
   }
 
   if (history.length > 10) {

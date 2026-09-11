@@ -8,6 +8,8 @@ export interface HistoryEntry {
   message: string;
   date: string;
   author: string;
+  prNumbers: number[];
+  prTitles: string[];
 }
 
 export interface Dependent {
@@ -107,17 +109,18 @@ export function listSymbolsByName(
     .all(name) as ResolvedSymbol[];
 }
 
-// ── History queries (Day 5) ─────────────────────────────────────────
+// ── History queries (Day 5, extended Day 7) ─────────────────────────
 
 /**
  * Looks up commit history for a specific file and line.
+ * Includes linked PR/issue data when available.
  */
 export function queryHistoryForLocation(
   db: Database.Database,
   filePath: string,
   line: number
 ): HistoryEntry[] {
-  return db
+  const rows = db
     .prepare(
       `SELECT c.sha as commitSha, c.message, c.date, c.author
        FROM commit_files cf
@@ -128,11 +131,14 @@ export function queryHistoryForLocation(
          AND (cf.end_line >= ? OR cf.end_line IS NULL)
        ORDER BY c.date DESC`
     )
-    .all(filePath, line, line) as HistoryEntry[];
+    .all(filePath, line, line) as Omit<HistoryEntry, "prNumbers" | "prTitles">[];
+
+  return enrichWithPrData(db, rows);
 }
 
 /**
  * Looks up commit history for a function/symbol by name.
+ * Includes linked PR/issue data when available.
  */
 export function queryHistoryForFunction(
   db: Database.Database,
@@ -151,7 +157,7 @@ export function queryHistoryForFunction(
 
   if (!symbol) return [];
 
-  return db
+  const rows = db
     .prepare(
       `SELECT c.sha as commitSha, c.message, c.date, c.author
        FROM commit_files cf
@@ -161,7 +167,56 @@ export function queryHistoryForFunction(
          AND (cf.end_line >= ? OR cf.end_line IS NULL)
        ORDER BY c.date DESC`
     )
-    .all(symbol.file_id, symbol.end_line, symbol.start_line) as HistoryEntry[];
+    .all(symbol.file_id, symbol.end_line, symbol.start_line) as Omit<HistoryEntry, "prNumbers" | "prTitles">[];
+
+  return enrichWithPrData(db, rows);
+}
+
+/**
+ * Enriches commit history rows with linked PR/issue data.
+ */
+function enrichWithPrData(
+  db: Database.Database,
+  rows: Omit<HistoryEntry, "prNumbers" | "prTitles">[]
+): HistoryEntry[] {
+  if (rows.length === 0) return [];
+
+  // Batch-query PR links for all commits in one query
+  const shas = rows.map((r) => r.commitSha);
+  const placeholders = shas.map(() => "?").join(",");
+  const prLinks = db
+    .prepare(
+      `SELECT commit_sha, pr_number, title
+       FROM pr_issue_links
+       WHERE commit_sha IN (${placeholders})`
+    )
+    .all(...shas) as { commit_sha: string; pr_number: number | null; title: string | null }[];
+
+  // Group PR data by commit SHA
+  const prBySha = new Map<string, { prNumbers: number[]; prTitles: string[] }>();
+  for (const link of prLinks) {
+    let entry = prBySha.get(link.commit_sha);
+    if (!entry) {
+      entry = { prNumbers: [], prTitles: [] };
+      prBySha.set(link.commit_sha, entry);
+    }
+    if (link.pr_number != null) {
+      entry.prNumbers.push(link.pr_number);
+    }
+    if (link.title != null) {
+      entry.prTitles.push(link.title);
+    }
+  }
+
+  // Merge PR data into history entries
+  return rows.map((row) => {
+    const prData = prBySha.get(row.commitSha);
+    return {
+      ...row,
+      prNumbers: prData?.prNumbers ?? [],
+      prTitles: prData?.prTitles ?? [],
+    };
+  });
 }
 
 // ── Impact queries (Day 6) ──────────────────────────────────────────

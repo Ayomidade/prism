@@ -99,6 +99,8 @@ describe("queryHistoryForLocation", () => {
       message: "Refactor openDatabase",
       date: "2026-09-05T14:30:00Z",
       author: "Bob",
+      prNumbers: [],
+      prTitles: [],
     });
   });
 

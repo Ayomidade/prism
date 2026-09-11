@@ -77,3 +77,21 @@ export function insertCommit(
      VALUES (?, ?, ?, ?)`,
   ).run(sha, author, date, message);
 }
+
+/**
+ * Inserts a PR/issue link for a commit. Uses INSERT OR IGNORE since
+ * the same commit may be processed multiple times during re-indexing.
+ */
+export function insertPrIssueLink(
+  db: Database.Database,
+  commitSha: string,
+  prNumber: number | undefined,
+  issueNumber: number | undefined,
+  title: string | undefined,
+  body: string | undefined
+): void {
+  db.prepare(
+    `INSERT OR IGNORE INTO pr_issue_links (commit_sha, pr_number, issue_number, title, body)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(commitSha, prNumber ?? null, issueNumber ?? null, title ?? null, body ?? null);
+}
