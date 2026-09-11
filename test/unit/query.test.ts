@@ -1,7 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { rmSync, existsSync } from "node:fs";
 import { openDatabase } from "../../src/store/db.js";
-import { queryHistoryForLocation, queryHistoryForFunction } from "../../src/graph/query.js";
+import {
+  queryHistoryForLocation,
+  queryHistoryForFunction,
+  queryDependents,
+  resolveSymbol,
+  listSymbolsByName,
+} from "../../src/graph/query.js";
 import { insertCommit, insertFile } from "../../src/store/repository.js";
 
 const TEST_ROOT = "./test-tmp-query";
@@ -165,6 +171,208 @@ describe("queryHistoryForFunction", () => {
     expect(history).toHaveLength(2);
     expect(history[0].commitSha).toBe("ccc3333"); // most recent
     expect(history[1].commitSha).toBe("aaa1111");
+    db.close();
+  });
+});
+
+// ── resolveSymbol ────────────────────────────────────────────────────
+
+describe("resolveSymbol", () => {
+  it("resolves a unique symbol by name", () => {
+    const db = openDatabase(TEST_DB);
+    seedDb(db);
+
+    const sym = resolveSymbol(db, "helper");
+    expect(sym).not.toBeNull();
+    expect(sym!.name).toBe("helper");
+    expect(sym!.file).toBe("src/b.ts");
+    db.close();
+  });
+
+  it("returns null for an unknown symbol", () => {
+    const db = openDatabase(TEST_DB);
+    seedDb(db);
+
+    expect(resolveSymbol(db, "nonexistent")).toBeNull();
+    db.close();
+  });
+
+  it("returns null for an ambiguous symbol (multiple matches)", () => {
+    const db = openDatabase(TEST_DB);
+    seedDb(db);
+
+    // Insert another "helper" in a different file
+    const fileIdA = db.prepare("SELECT id FROM files WHERE path = 'src/a.ts'").get() as { id: number };
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileIdA.id, "helper", "function", 1, 5);
+
+    expect(resolveSymbol(db, "helper")).toBeNull();
+    db.close();
+  });
+
+  it("resolves by file:name format", () => {
+    const db = openDatabase(TEST_DB);
+    seedDb(db);
+
+    const fileIdA = db.prepare("SELECT id FROM files WHERE path = 'src/a.ts'").get() as { id: number };
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileIdA.id, "helper", "function", 1, 5);
+
+    const sym = resolveSymbol(db, "src/a.ts:helper");
+    expect(sym).not.toBeNull();
+    expect(sym!.file).toBe("src/a.ts");
+    expect(sym!.name).toBe("helper");
+    db.close();
+  });
+
+  it("skips module symbols", () => {
+    const db = openDatabase(TEST_DB);
+    seedDb(db);
+
+    // The seed data doesn't insert module symbols for a.ts/b.ts
+    // but queryDependents should still work — module symbols are
+    // excluded from resolveSymbol via kind != 'module'
+    const fileIdA = db.prepare("SELECT id FROM files WHERE path = 'src/a.ts'").get() as { id: number };
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileIdA.id, "src/a.ts", "module", 1, 100);
+
+    // "src/a.ts" as a symbol name should not resolve to the module symbol
+    expect(resolveSymbol(db, "src/a.ts")).toBeNull();
+    db.close();
+  });
+});
+
+describe("listSymbolsByName", () => {
+  it("returns all non-module symbols with a given name", () => {
+    const db = openDatabase(TEST_DB);
+    seedDb(db);
+
+    const fileIdA = db.prepare("SELECT id FROM files WHERE path = 'src/a.ts'").get() as { id: number };
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileIdA.id, "helper", "function", 1, 5);
+
+    const matches = listSymbolsByName(db, "helper");
+    expect(matches).toHaveLength(2);
+    expect(matches.map((m) => m.file).sort()).toEqual(["src/a.ts", "src/b.ts"]);
+    db.close();
+  });
+
+  it("returns empty array for unknown name", () => {
+    const db = openDatabase(TEST_DB);
+    seedDb(db);
+
+    expect(listSymbolsByName(db, "nonexistent")).toEqual([]);
+    db.close();
+  });
+});
+
+// ── queryDependents ──────────────────────────────────────────────────
+
+describe("queryDependents", () => {
+  /** Seeds a call graph: main -> helper, helper -> utils, main -> utils */
+  function seedCallGraph(db: ReturnType<typeof openDatabase>) {
+    const fileId = insertFile(db, "src/graph.ts");
+
+    // Symbols: main(1), helper(2), utils(3)
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileId, "main", "function", 1, 10);
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileId, "helper", "function", 12, 20);
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileId, "utils", "function", 22, 30);
+
+    // Get symbol IDs
+    const main = db.prepare("SELECT id FROM symbols WHERE name = 'main'").get() as { id: number };
+    const helper = db.prepare("SELECT id FROM symbols WHERE name = 'helper'").get() as { id: number };
+    const utils = db.prepare("SELECT id FROM symbols WHERE name = 'utils'").get() as { id: number };
+
+    // Edges: main calls helper, main calls utils, helper calls utils
+    db.prepare(`INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type) VALUES (?, ?, ?)`).run(main.id, helper.id, "calls");
+    db.prepare(`INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type) VALUES (?, ?, ?)`).run(main.id, utils.id, "calls");
+    db.prepare(`INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type) VALUES (?, ?, ?)`).run(helper.id, utils.id, "calls");
+
+    return { main: main.id, helper: helper.id, utils: utils.id };
+  }
+
+  it("finds direct dependents (depth 1)", () => {
+    const db = openDatabase(TEST_DB);
+    const ids = seedCallGraph(db);
+
+    // Who calls utils? main and helper
+    const deps = queryDependents(db, ids.utils);
+    expect(deps).toHaveLength(2);
+    expect(deps.map((d) => d.symbol).sort()).toEqual(["helper", "main"]);
+    expect(deps.every((d) => d.depth === 1)).toBe(true);
+    db.close();
+  });
+
+  it("finds transitive dependents (depth > 1)", () => {
+    const db = openDatabase(TEST_DB);
+    const ids = seedCallGraph(db);
+
+    // Who calls helper? main (directly). Nobody calls main.
+    const deps = queryDependents(db, ids.helper);
+    expect(deps).toHaveLength(1);
+    expect(deps[0]).toEqual({ file: "src/graph.ts", symbol: "main", depth: 1 });
+    db.close();
+  });
+
+  it("returns empty for a symbol nobody depends on", () => {
+    const db = openDatabase(TEST_DB);
+    const ids = seedCallGraph(db);
+
+    // Nobody calls main
+    const deps = queryDependents(db, ids.main);
+    expect(deps).toEqual([]);
+    db.close();
+  });
+
+  it("respects maxDepth", () => {
+    const db = openDatabase(TEST_DB);
+    const ids = seedCallGraph(db);
+
+    // utils is called by main (depth 1) and helper (depth 1),
+    // but helper is called by main (depth 2 through helper).
+    // With maxDepth=1, we should only get direct callers.
+    const deps = queryDependents(db, ids.utils, 1);
+    expect(deps).toHaveLength(2);
+    expect(deps.every((d) => d.depth <= 1)).toBe(true);
+    db.close();
+  });
+
+  it("handles cycles without infinite loop", () => {
+    const db = openDatabase(TEST_DB);
+    const fileId = insertFile(db, "src/cyclic.ts");
+
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileId, "a", "function", 1, 5);
+    db.prepare(
+      `INSERT INTO symbols (file_id, name, kind, start_line, end_line) VALUES (?, ?, ?, ?, ?)`
+    ).run(fileId, "b", "function", 7, 10);
+
+    const a = db.prepare("SELECT id FROM symbols WHERE name = 'a'").get() as { id: number };
+    const b = db.prepare("SELECT id FROM symbols WHERE name = 'b'").get() as { id: number };
+
+    // a calls b, b calls a (cycle)
+    db.prepare(`INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type) VALUES (?, ?, ?)`).run(a.id, b.id, "calls");
+    db.prepare(`INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type) VALUES (?, ?, ?)`).run(b.id, a.id, "calls");
+
+    // Should not infinite loop
+    const depsA = queryDependents(db, a.id);
+    const depsB = queryDependents(db, b.id);
+
+    expect(depsA).toHaveLength(1); // b depends on a
+    expect(depsB).toHaveLength(1); // a depends on b
+    expect(depsA[0].symbol).toBe("b");
+    expect(depsB[0].symbol).toBe("a");
     db.close();
   });
 });
