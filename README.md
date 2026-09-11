@@ -13,9 +13,9 @@ No code leaves your machine. No server, no account, no cloud dependency required
 
 ## Status
 
-🚧 **Phase 1, Day 3 complete.** Git ingestion (Day 2) + AST parsing + code graph (Day 3) are implemented and tested. The full pipeline — parse source files, extract imports/exports, store module symbols and import edges in SQLite — is working. See `linking.md` for a detailed build log.
+🚧 **Phase 2, Day 5 complete.** `prism why` command is implemented — query commit history for a file/line or function name, with template-based summaries and `--json` output. Code graph now includes symbol-level call edges (Day 4). 66/66 tests passing. See `linking.md` for a detailed build log.
 
-**Next up:** Day 4 — function/symbol-level call resolution (who calls whom inside a function body).
+**Next up:** Day 6 — `prism impact` command (reverse dependency traversal).
 
 ## Planning Docs
 

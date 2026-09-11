@@ -309,6 +309,84 @@ The blame test that checks "single-commit files" kept failing because it used `s
 
 ---
 
+## Day 4 — Symbol-level call resolution
+
+### What we built
+
+Extended the graph from file-level structure (Day 3) to symbol-level call relationships:
+
+**parser.ts changes:**
+- `ParsedSymbol` gains `calls: string[]` — simple function-call names extracted from each symbol's body via `collectCalls()`
+- New `NamedImport` interface tracks which named identifiers come from which import specifier
+- `ParsedFile` gains `namedImports: NamedImport[]` — used for call resolution, separate from `imports[]` which drives file-level import edges
+- Only captures simple identifier calls (`foo()`), not method calls (`obj.method()`) or property-access callees
+- Type-only imports excluded from `namedImports` (they don't exist at runtime)
+
+**build-graph.ts changes:**
+- Pass 1 now inserts real symbols (functions, classes, exports) alongside the module placeholder
+- Pass 2 builds an import-name-to-file resolution map from `namedImports`
+- Pass 3 inserts both `imports` edges (module→module) and `calls` edges (symbol→symbol)
+- Call resolution order: local declaration → imported name → unresolved (skip)
+- Ambiguous imports (same name from multiple files) are skipped, not guessed
+
+**Test coverage:**
+- `parser.test.ts`: 13 tests (was 7) — named imports, type-only exclusion, call collection, method-call exclusion
+- `build-graph.test.ts`: 10 tests (was 5) — symbol persistence, local calls, imported calls, external package skip, ambiguous name skip
+- **50/50 total tests pass**
+
+### Verified against real repo
+
+9 files parsed → 32 symbols → 6 import edges → 13 call edges. All cross-file relationships correct:
+- `buildGraph` → `insertFile`, `insertSymbol`, `insertEdge`, `resolveImport` (cross-file imports)
+- `openDatabase` → `getStoredSchemaVersion`, `setStoredSchemaVersion` (local calls)
+- `checkSchemaVersion` → `getStoredSchemaVersion` (local call)
+
+### Deliberate scope cuts
+
+Method calls (`foo.bar()`), calls through destructuring, and re-exports are skipped. These need type-checker-backed resolution to do correctly — guessing would produce a graph that's confidently wrong rather than honestly incomplete. Consistent with v1 tradeoffs: %s-only commit messages, relative-import-only resolution, full re-index on every init.
+
+### `collectCalls` caveat
+
+`collectCalls` uses `forEachDescendant` which traverses the entire subtree. For a function declaration node, this includes the function's own name node as a potential call target. In practice this hasn't caused false positives (function names aren't CallExpressions), but it means the traversal is broader than strictly necessary. If false positives ever appear, tightening to only traverse the function body block would be the fix.
+
+---
+
+## Day 5 — `why` command
+
+### What we built
+
+Implemented the first user-facing command: `prism why <file:line>` and `prism why --function <name>`.
+
+**query.ts** — Two query functions:
+- `queryHistoryForLocation(db, filePath, line)` — finds commit_files rows where the line falls within the committed range, joins to commits for metadata, returns most-recent-first
+- `queryHistoryForFunction(db, functionName)` — resolves the symbol to its file + line range (skipping module symbols), then queries commit_files for that range. Handles the "two-step" lookup: name → symbol → file → commits
+
+**template.ts** — Template-based summary builder:
+- `buildTemplateSummary(history, target)` — human-readable text output with commit dates, SHAs, authors, and first-line messages. Shows up to 10 commits, truncation notice for more. Tags with `confidence: documented` when history exists
+- `buildTemplateSummaryJson(history, target)` — structured object for `--json` mode
+- Empty history returns a clear "no history found" message instead of fabricating
+
+**why.ts** — CLI wiring:
+- Parses `file:line` format via regex, validates before querying
+- `--function <name>` routes to `queryHistoryForFunction`
+- `--json` flag switches to JSON output
+- Fails clearly when `.prism/graph.db` doesn't exist (suggests `prism init`)
+
+**Test coverage:**
+- `query.test.ts`: 9 tests (boundary lines, exact matches, empty results, metadata, function lookup, module symbol skip)
+- `template.test.ts`: 7 tests (formatting, truncation, empty history, JSON output, multi-line messages)
+- **66/66 total tests pass**
+
+### Design decisions
+
+- **Query overlap logic:** `start_line <= target AND (end_line >= target OR end_line IS NULL)` — handles both bounded ranges and NULL end_lines (which git blame produces for partial files)
+- **Function lookup is a two-step join:** name → symbols table → file_id + line range → commit_files. This means `prism why --function openDatabase` works even though the user doesn't know which file it's in
+- **Module symbols excluded from function lookup:** `WHERE kind != 'module'` prevents `prism why --function src/a.ts` from matching the entire-file module symbol
+- **Template summary truncates at 10 commits:** Prevents overwhelming output on heavily-modified code. The "and N more commits" notice preserves the full count
+- **Confidence tag is "documented" or "none":** No "inferred" tag for v1 since we don't have AI summarization yet. The tag becomes meaningful in Phase 3
+
+---
+
 ## Key Takeaways for Future Work
 
 1. **Always test against a real repo with real history.** The 1MB default `maxBuffer` bug would have been invisible on the scaffold project but fatal on any production codebase.
