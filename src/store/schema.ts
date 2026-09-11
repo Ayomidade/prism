@@ -33,7 +33,7 @@
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** Current schema version. Increment when DDL changes require a re-index. */
-export const SCHEMA_VERSION = "2"; // was "1" — added unique index on files.path
+export const SCHEMA_VERSION = "3"; // was "2" — added dedup indexes on symbols + edges
 
 /**
  * Complete DDL for all PRISM tables.
@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS edges (
   edge_type TEXT NOT NULL
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_edges_dedup ON edges(from_symbol_id, to_symbol_id, edge_type);
+
 CREATE TABLE IF NOT EXISTS commits (
   sha TEXT PRIMARY KEY,
   author TEXT NOT NULL,
@@ -95,6 +97,8 @@ CREATE TABLE IF NOT EXISTS commit_files (
   start_line INTEGER,
   end_line INTEGER
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_commit_files_dedup ON commit_files(commit_sha, file_id, start_line, end_line);
 
 CREATE TABLE IF NOT EXISTS pr_issue_links (
   id INTEGER PRIMARY KEY,

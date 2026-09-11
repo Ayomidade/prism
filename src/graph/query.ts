@@ -181,6 +181,14 @@ function enrichWithPrData(
 ): HistoryEntry[] {
   if (rows.length === 0) return [];
 
+  // Check if PR data exists at all (avoids unnecessary query when no token configured)
+  const hasPrData = db
+    .prepare("SELECT 1 FROM pr_issue_links LIMIT 1")
+    .get() as object | undefined;
+  if (!hasPrData) {
+    return rows.map((row) => ({ ...row, prNumbers: [], prTitles: [] }));
+  }
+
   // Batch-query PR links for all commits in one query
   const shas = rows.map((r) => r.commitSha);
   const placeholders = shas.map(() => "?").join(",");

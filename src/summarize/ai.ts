@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { HistoryEntry } from "../graph/query.js";
 import type { SummaryResult, Summarizer } from "./types.js";
 
@@ -13,13 +12,26 @@ import type { SummaryResult, Summarizer } from "./types.js";
 
 const MODEL = "claude-sonnet-4-20250514";
 const MAX_HISTORY_ENTRIES = 15;
-const MAX_TOKENS = 512;
+const MAX_TOKENS = 1024;
 
 /**
  * Creates an AI summarizer if an API key is available.
  * Returns null if no key is configured (caller should use template summarizer).
+ *
+ * Uses a dynamic import for @anthropic-ai/sdk so it doesn't fail
+ * if the package isn't installed (optional peer dependency).
  */
-export function createAiSummarizer(apiKey: string): Summarizer {
+export async function createAiSummarizer(apiKey: string): Promise<Summarizer> {
+  let Anthropic: any;
+  try {
+    const mod = await import("@anthropic-ai/sdk");
+    Anthropic = mod.default;
+  } catch {
+    throw new Error(
+      "@anthropic-ai/sdk is not installed. Install it with: npm install @anthropic-ai/sdk"
+    );
+  }
+
   const client = new Anthropic({ apiKey });
 
   return {
@@ -33,14 +45,22 @@ export function createAiSummarizer(apiKey: string): Summarizer {
 
       const prompt = buildPrompt(history, target);
 
-      const response = await client.messages.create({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        messages: [{ role: "user", content: prompt }],
-      });
-
-      const aiText =
-        response.content[0]?.type === "text" ? response.content[0].text : "";
+      let aiText = "";
+      try {
+        const response = await client.messages.create({
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          messages: [{ role: "user", content: prompt }],
+        });
+        aiText = response.content[0]?.type === "text" ? response.content[0].text : "";
+      } catch (err: any) {
+        // API error — fall back to template-only output
+        const templateHeader = buildTemplateHeader(history, target);
+        return {
+          text: `${templateHeader}\n\n(AI analysis unavailable: ${err.message})`,
+          confidence: "documented",
+        };
+      }
 
       const templateHeader = buildTemplateHeader(history, target);
       const text = `${templateHeader}\n\nAI analysis:\n${aiText}`;
@@ -69,21 +89,26 @@ export function createAiSummarizer(apiKey: string): Summarizer {
 
       const prompt = buildPrompt(history, target);
 
-      const response = await client.messages.create({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        messages: [{ role: "user", content: prompt }],
-      });
-
-      const aiText =
-        response.content[0]?.type === "text" ? response.content[0].text : "";
+      let aiText = "";
+      let confidence = "ai-inferred";
+      try {
+        const response = await client.messages.create({
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          messages: [{ role: "user", content: prompt }],
+        });
+        aiText = response.content[0]?.type === "text" ? response.content[0].text : "";
+      } catch {
+        // API error — return without AI summary
+        confidence = "documented";
+      }
 
       return {
         target,
-        confidence: "ai-inferred",
+        confidence,
         commitCount: history.length,
         history,
-        aiSummary: aiText,
+        ...(aiText ? { aiSummary: aiText } : {}),
       };
     },
   };

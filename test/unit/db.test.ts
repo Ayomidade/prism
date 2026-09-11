@@ -58,7 +58,7 @@ describe("openDatabase", () => {
       .prepare("SELECT value FROM meta WHERE key = 'schema_version'")
       .get() as { value: string };
 
-    expect(row.value).toBe("2");
+    expect(row.value).toBe("3");
     db.close();
   });
 

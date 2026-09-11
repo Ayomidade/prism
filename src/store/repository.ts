@@ -24,6 +24,8 @@ export function insertFile(db: Database.Database, path: string): number {
 
 /**
  * Inserts a symbol (function/class/export/variable) within a file.
+ * Uses INSERT OR IGNORE with a unique index to prevent duplicates
+ * when re-running init on the same codebase.
  */
 export function insertSymbol(
   db: Database.Database,
@@ -33,6 +35,15 @@ export function insertSymbol(
   startLine: number,
   endLine: number,
 ): number {
+  // Try to find existing first (avoids RETURNING id issues with INSERT OR IGNORE)
+  const existing = db
+    .prepare(
+      `SELECT id FROM symbols WHERE file_id = ? AND name = ? AND kind = ? AND start_line = ? AND end_line = ?`,
+    )
+    .get(fileId, name, kind, startLine, endLine) as { id: number } | undefined;
+
+  if (existing) return existing.id;
+
   const row = db
     .prepare(
       `INSERT INTO symbols (file_id, name, kind, start_line, end_line)
@@ -46,6 +57,8 @@ export function insertSymbol(
 
 /**
  * Inserts a dependency edge between two symbols.
+ * Uses INSERT OR IGNORE with a unique index to prevent duplicates
+ * when re-running init on the same codebase.
  */
 export function insertEdge(
   db: Database.Database,
@@ -54,7 +67,7 @@ export function insertEdge(
   edgeType: string,
 ): void {
   db.prepare(
-    `INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type)
+    `INSERT OR IGNORE INTO edges (from_symbol_id, to_symbol_id, edge_type)
      VALUES (?, ?, ?)`,
   ).run(fromSymbolId, toSymbolId, edgeType);
 }

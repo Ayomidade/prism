@@ -4,16 +4,20 @@ import { parseGitBlame } from "../../src/ingestion/git/blame.js";
 const REPO_ROOT = ".";
 
 describe("parseGitBlame", () => {
+  // Use src/ingestion/github/client.ts (10 lines, single commit) for
+  // stable assertions that won't break when other files are modified.
+  const STABLE_FILE = "src/ingestion/github/client.ts";
+  const STABLE_LINES = 10;
+
   it("attributes every line in a real file to a commit", async () => {
-    const result = await parseGitBlame(REPO_ROOT, "src/store/db.ts");
-    // db.ts is 149 lines — every line should be attributed
-    expect(result.length).toBe(149);
+    const result = await parseGitBlame(REPO_ROOT, STABLE_FILE);
+    expect(result.length).toBe(STABLE_LINES);
   });
 
   it("returns sequential line numbers starting from 1", async () => {
-    const result = await parseGitBlame(REPO_ROOT, "src/store/db.ts");
+    const result = await parseGitBlame(REPO_ROOT, STABLE_FILE);
     expect(result[0].line).toBe(1);
-    expect(result[result.length - 1].line).toBe(149);
+    expect(result[result.length - 1].line).toBe(STABLE_LINES);
     // No gaps, no duplicates
     const lines = result.map((r) => r.line).sort((a, b) => a - b);
     for (let i = 0; i < lines.length; i++) {
@@ -22,20 +26,18 @@ describe("parseGitBlame", () => {
   });
 
   it("returns valid 40-char hex SHAs", async () => {
-    const result = await parseGitBlame(REPO_ROOT, "src/store/db.ts");
+    const result = await parseGitBlame(REPO_ROOT, STABLE_FILE);
     for (const r of result) {
       expect(r.commitSha).toMatch(/^[0-9a-f]{40}$/);
     }
   });
 
   it("maps all lines to the correct commit for single-commit files", async () => {
-    // db.ts was created in one commit (192550a4) and never modified after.
-    // Using this instead of schema.ts which has uncommitted edits that
-    // show as SHA 00000000 in blame output.
-    const result = await parseGitBlame(REPO_ROOT, "src/store/db.ts");
+    // client.ts was created in the scaffold commit and never modified.
+    const result = await parseGitBlame(REPO_ROOT, STABLE_FILE);
     const shas = new Set(result.map((r) => r.commitSha));
     expect(shas.size).toBe(1);
-    expect(result.length).toBe(149);
+    expect(result.length).toBe(STABLE_LINES);
   });
 
   it("returns [] for a nonexistent file", async () => {

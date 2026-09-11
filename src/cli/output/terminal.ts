@@ -1,5 +1,10 @@
-// Human-readable terminal formatting for `why` and `impact` results.
-// Use chalk for color, a simple tree renderer for `impact`'s dependent list.
+// Terminal formatting helpers for `why` and `impact` output.
+//
+// The CLI commands (why.ts, impact.ts) currently build terminal output
+// directly via buildTemplateSummary() and formatTree(). These interfaces
+// are defined here for future use when richer terminal formatting is needed
+// (colors via chalk, structured tables, etc.).
+//
 // See docs/technical-architecture.md Section 1 (Frontend / CLI output).
 
 export interface WhyResult {
@@ -11,14 +16,4 @@ export interface WhyResult {
 export interface ImpactResult {
   symbol: string;
   dependents: Array<{ file: string; symbol: string; depth: number }>;
-}
-
-export function formatWhyForTerminal(_result: WhyResult): string {
-  // TODO: implement
-  throw new Error("formatWhyForTerminal: not implemented yet");
-}
-
-export function formatImpactForTerminal(_result: ImpactResult): string {
-  // TODO: implement
-  throw new Error("formatImpactForTerminal: not implemented yet");
 }

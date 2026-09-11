@@ -2,6 +2,9 @@ import type { Command } from "commander";
 import { openDatabase } from "../../store/db.js";
 import { queryHistoryForLocation, queryHistoryForFunction } from "../../graph/query.js";
 import { buildTemplateSummary, buildTemplateSummaryJson } from "../../summarize/template.js";
+import { createAiSummarizer } from "../../summarize/ai.js";
+import { getAnthropicKey } from "../../config/tokens.js";
+import type { Summarizer } from "../../summarize/types.js";
 import { existsSync } from "node:fs";
 
 // Build spec: docs/prism-v1-build-spec.md Section 5 (`prism why`)
@@ -39,6 +42,12 @@ export function registerWhyCommand(program: Command): void {
 
       const db = openDatabase(dbPath);
 
+      // Use AI summarizer if Anthropic key is configured, fall back to template
+      const anthropicKey = getAnthropicKey();
+      const summarizer: Summarizer = anthropicKey
+        ? await createAiSummarizer(anthropicKey)
+        : { summarize: async (h, t) => ({ text: buildTemplateSummary(h, t), confidence: "documented" as const }), summarizeJson: async (h, t) => buildTemplateSummaryJson(h, t) };
+
       try {
         let history;
         let target;
@@ -64,10 +73,11 @@ export function registerWhyCommand(program: Command): void {
         }
 
         if (options.json) {
-          const json = buildTemplateSummaryJson(history, target);
+          const json = await summarizer.summarizeJson(history, target);
           console.log(JSON.stringify(json, null, 2));
         } else {
-          console.log(buildTemplateSummary(history, target));
+          const result = await summarizer.summarize(history, target);
+          console.log(result.text);
         }
       } finally {
         db.close();

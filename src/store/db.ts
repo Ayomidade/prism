@@ -89,6 +89,13 @@ export function openDatabase(dbPath: string): Database.Database {
   // would depend entirely on the application code.
   db.pragma("foreign_keys = ON");
 
+  // Deduplicate edges and symbols before applying unique indexes.
+  // Previous schema versions didn't have unique constraints, so re-running
+  // init could have created duplicate rows. This migration is safe to run
+  // on every open — it's a no-op when there are no duplicates.
+  deduplicateEdges(db);
+  deduplicateSymbols(db);
+
   // Schema DDL uses CREATE TABLE IF NOT EXISTS, so this is safe to run
   // on every open — it's a no-op if the tables already exist.
   db.exec(SCHEMA_SQL);
@@ -146,4 +153,47 @@ function setStoredSchemaVersion(db: Database.Database, version: string): void {
     `INSERT INTO meta (key, value) VALUES ('schema_version', ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
   ).run(version);
+}
+
+/**
+ * Removes duplicate edges before creating the unique index.
+ * Keeps the row with the lowest id for each (from, to, type) combination.
+ */
+function deduplicateEdges(db: Database.Database): void {
+  // Check if edges table exists (it won't on a fresh DB)
+  const tableExists = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edges'")
+    .get();
+  if (!tableExists) return;
+
+  // Check if the unique index already exists (no dedup needed)
+  const indexExists = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_edges_dedup'")
+    .get();
+  if (indexExists) return;
+
+  // Remove duplicates: keep the lowest id for each unique edge
+  db.exec(`
+    DELETE FROM edges WHERE id NOT IN (
+      SELECT MIN(id) FROM edges GROUP BY from_symbol_id, to_symbol_id, edge_type
+    )
+  `);
+}
+
+/**
+ * Removes duplicate symbols before the application logic runs.
+ * Keeps the row with the lowest id for each unique symbol definition.
+ */
+function deduplicateSymbols(db: Database.Database): void {
+  const tableExists = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='symbols'")
+    .get();
+  if (!tableExists) return;
+
+  // Remove duplicates: keep the lowest id for each unique symbol
+  db.exec(`
+    DELETE FROM symbols WHERE id NOT IN (
+      SELECT MIN(id) FROM symbols GROUP BY file_id, name, kind, start_line, end_line
+    )
+  `);
 }
