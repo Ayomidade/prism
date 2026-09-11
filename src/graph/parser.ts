@@ -9,6 +9,14 @@ export interface ParsedSymbol {
   kind: "function" | "class" | "export" | "variable";
   startLine: number;
   endLine: number;
+  /** Names of functions called within this symbol's body (simple identifiers only). */
+  calls: string[];
+}
+
+/** A named import from a relative module — tracks which names come from where. */
+export interface NamedImport {
+  source: string; // relative import specifier, e.g. "./schema.js"
+  names: string[]; // named identifiers, e.g. ["SCHEMA_SQL", "SCHEMA_VERSION"]
 }
 
 export interface ParsedFile {
@@ -16,6 +24,7 @@ export interface ParsedFile {
   lineCount: number;
   symbols: ParsedSymbol[];
   imports: string[]; // resolved relative paths only — external packages excluded
+  namedImports: NamedImport[]; // named imports with source tracking (for call resolution)
 }
 
 export function parseSourceFile(project: Project, filePath: string): ParsedFile {
@@ -32,6 +41,7 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
       kind: "function",
       startLine: fn.getStartLineNumber(),
       endLine: fn.getEndLineNumber(),
+      calls: collectCalls(fn),
     });
   }
 
@@ -44,6 +54,7 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
       kind: "class",
       startLine: cls.getStartLineNumber(),
       endLine: cls.getEndLineNumber(),
+      calls: collectCalls(cls),
     });
   }
 
@@ -60,6 +71,7 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
       kind: "export",
       startLine: decl.getStartLineNumber(),
       endLine: decl.getEndLineNumber(),
+      calls: [],
     });
   }
 
@@ -67,10 +79,23 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
   // repo graph. Bare specifiers (react, lodash) are external packages and
   // out of scope for the dependency graph.
   const imports: string[] = [];
+  const namedImports: NamedImport[] = [];
+
   for (const importDecl of sourceFile.getImportDeclarations()) {
     const specifier = importDecl.getModuleSpecifierValue();
-    if (specifier.startsWith(".")) {
-      imports.push(specifier);
+    if (!specifier.startsWith(".")) continue;
+
+    imports.push(specifier);
+
+    // Track named imports for call resolution.
+    // Type-only imports are excluded — they don't exist at runtime.
+    // Default-only and namespace-only imports are excluded — we can't
+    // resolve individual names from them without type-checker info.
+    if (importDecl.isTypeOnly()) continue;
+
+    const namedNames = importDecl.getNamedImports().map((n) => n.getName());
+    if (namedNames.length > 0) {
+      namedImports.push({ source: specifier, names: namedNames });
     }
   }
 
@@ -79,7 +104,32 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
     lineCount: sourceFile.getEndLineNumber(),
     symbols,
     imports,
+    namedImports,
   };
+}
+
+/**
+ * Collects simple call-expression names from a function/class body.
+ *
+ * Only captures direct identifier calls: `foo()` → "foo".
+ * Skips method calls (obj.method()), calls through
+ * destructuring, and any other non-simple callees — these need
+ * type-checker-backed resolution to do correctly, which is out of
+ * scope for v1.
+ */
+function collectCalls(node: { forEachDescendant: Function }): string[] {
+  const calls: string[] = [];
+  node.forEachDescendant((child: any) => {
+    if (child.getKind() === SyntaxKind.CallExpression) {
+      const expr = child.asKindOrThrow(SyntaxKind.CallExpression);
+      const callee = expr.getExpression();
+      // Only capture simple identifier calls: foo(...)
+      if (callee.getKind() === SyntaxKind.Identifier) {
+        calls.push(callee.getText());
+      }
+    }
+  });
+  return calls;
 }
 
 /**
