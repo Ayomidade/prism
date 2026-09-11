@@ -387,6 +387,38 @@ Implemented the first user-facing command: `prism why <file:line>` and `prism wh
 
 ---
 
+## Day 6 — `impact` command
+
+### What we built
+
+Implemented the second graph-traversal command: `prism impact <symbol>`.
+
+**query.ts additions:**
+- `resolveSymbol(db, target)` — resolves `symbol` or `file:symbol` format. Returns `ResolvedSymbol | null`. Ambiguous names (multiple matches without file prefix) return null
+- `listSymbolsByName(db, name)` — returns all non-module matches for ambiguity reporting
+- `queryDependents(db, symbolId, maxDepth?)` — BFS traversal of reverse `calls` edges. Uses a queue, de-duplicates visited nodes, returns `Dependent[]` sorted by depth then file then symbol
+
+**impact.ts CLI:**
+- Parses `<symbol>` argument, resolves via `resolveSymbol`, queries `queryDependents`
+- Default: terminal tree grouped by file, indented by depth
+- `--json`: flat list with `{ target, dependents }` structure
+- Ambiguity: lists all matching symbols with file paths and exits
+- Not found: clear error message
+
+**Test coverage:**
+- `query.test.ts`: 12 new tests (resolveSymbol unique/ambiguous/file:name/module skip, listSymbolsByName, queryDependents direct/transitive/empty/maxDepth/cycle handling)
+- **78/78 total tests pass**
+
+### Design decisions
+
+- **Only `calls` edges for impact traversal, not `imports`:** Import edges connect module symbols (entire files). Following them would flood output with "every file imports every file it uses" — not useful for "what breaks if I change this function?" The `calls` edge graph is the meaningful dependency structure
+- **BFS, not DFS:** BFS naturally discovers dependents level by level, giving accurate depth numbers. DFS would require post-processing to compute depths correctly
+- **Cycle handling via visited set:** Once a symbol is visited, it's never re-queued. This prevents infinite loops and gives correct (shortest-path) depths
+- **`file:symbol` disambiguation uses `lastIndexOf(":")`:** Handles paths like `src/commands/init.ts:registerInitCommand` where the file path itself contains no colons but the separator does
+- **Max depth parameter:** `queryDependents` accepts an optional `maxDepth` for future use (e.g., `--depth 2` flag). Not exposed in CLI yet — v1 defaults to unlimited
+
+---
+
 ## Key Takeaways for Future Work
 
 1. **Always test against a real repo with real history.** The 1MB default `maxBuffer` bug would have been invisible on the scaffold project but fatal on any production codebase.

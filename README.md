@@ -13,9 +13,9 @@ No code leaves your machine. No server, no account, no cloud dependency required
 
 ## Status
 
-🚧 **Phase 2, Day 5 complete.** `prism why` command is implemented — query commit history for a file/line or function name, with template-based summaries and `--json` output. Code graph now includes symbol-level call edges (Day 4). 66/66 tests passing. See `linking.md` for a detailed build log.
+🚧 **Phase 2, Day 6 complete.** `prism impact` command implemented — reverse dependency traversal with BFS, `file:symbol` disambiguation, terminal tree output and `--json` mode. Both `prism why` and `prism impact` are now functional. 78/78 tests passing. See `linking.md` for a detailed build log.
 
-**Next up:** Day 6 — `prism impact` command (reverse dependency traversal).
+**Next up:** Day 7 — GitHub API integration (fetch linked PRs/issues for commits).
 
 ## Planning Docs
 
