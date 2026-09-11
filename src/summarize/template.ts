@@ -1,11 +1,24 @@
 import type { HistoryEntry } from "../graph/query.js";
+import type { SummaryResult, Summarizer } from "./types.js";
 
 // Default, no-AI "why" summary builder. Assembles raw commit messages and
 // PR/issue text into a readable summary tagged confidence: "documented".
 // This is the required v1 default -- see docs/mvp-contract.md.
-//
-// AI-assisted summarization (confidence: "ai-inferred") is an explicit
-// fast-follow, not part of the v1 contract. Do not add an AI dependency here.
+
+/**
+ * Creates a template-based summarizer (no API key required).
+ */
+export function createTemplateSummarizer(): Summarizer {
+  return {
+    async summarize(history: HistoryEntry[], target: string): Promise<SummaryResult> {
+      return { text: buildTemplateSummary(history, target), confidence: "documented" };
+    },
+
+    async summarizeJson(history: HistoryEntry[], target: string) {
+      return buildTemplateSummaryJson(history, target);
+    },
+  };
+}
 
 /**
  * Builds a human-readable summary of why code exists, based on commit history.
@@ -26,18 +39,15 @@ export function buildTemplateSummary(
   lines.push(`Why does ${target} exist?`);
   lines.push("");
 
-  // Show up to 10 most recent commits
   const shown = history.slice(0, 10);
 
   for (const entry of shown) {
-    const date = entry.date.slice(0, 10); // YYYY-MM-DD
+    const date = entry.date.slice(0, 10);
     const sha = entry.commitSha.slice(0, 7);
-    // First line of commit message only
     const summary = entry.message.split("\n")[0];
     lines.push(`${date}  ${sha}  ${entry.author}`);
     lines.push(`  ${summary}`);
 
-    // Show linked PRs if available
     if (entry.prNumbers.length > 0) {
       for (let i = 0; i < entry.prNumbers.length; i++) {
         const prNum = entry.prNumbers[i];
