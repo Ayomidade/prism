@@ -107,6 +107,9 @@ const counts = {
 
 process.stdout.write(JSON.stringify(counts));
 db.close();
+// Force immediate exit to prevent better-sqlite3 destructor crash
+// during Node.js process teardown (RemoveEnvironmentCleanupHook assertion).
+process.exit(0);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,9 @@
 import type { Command } from "commander";
 import { openDatabase } from "../../store/db.js";
 import { resolveSymbol, queryDependents, listSymbolsByName } from "../../graph/query.js";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { generateImpactHtml } from "../output/html.js";
 import type { Dependent } from "../../graph/query.js";
 
 // Build spec: docs/prism-v1-build-spec.md Section 5 (`prism impact`)
@@ -65,7 +67,8 @@ export function registerImpactCommand(program: Command): void {
     .description("Show what could break if a symbol changes")
     .argument("<symbol>", "Symbol name, or file:symbol to disambiguate")
     .option("--json", "Output as JSON instead of a tree")
-    .action(async (symbol: string, options: { json?: boolean }) => {
+    .option("--html [path]", "Export as a standalone HTML report (default: impact-report.html)")
+    .action(async (symbol: string, options: { json?: boolean; html?: string | boolean }) => {
       const dbPath = ".prism/graph.db";
       if (!existsSync(dbPath)) {
         console.error("Error: No indexed data found. Run `prism init` first.");
@@ -94,7 +97,29 @@ export function registerImpactCommand(program: Command): void {
         const target = `${resolved.file}:${resolved.name}`;
         const dependents = queryDependents(db, resolved.id);
 
-        if (options.json) {
+        if (options.html) {
+          // Determine output path
+          const htmlPath = typeof options.html === "string" && options.html.length > 0
+            ? options.html
+            : "impact-report.html";
+
+          // Get repo name from git remote if available
+          let repoName: string | undefined;
+          try {
+            const remote = execSync("git remote get-url origin", { encoding: "utf-8" }).trim();
+            const match = remote.match(/[:/]([^/]+)\/([^/.]+)(?:\.git)?$/);
+            if (match) repoName = `${match[1]}/${match[2]}`;
+          } catch {
+            // No remote configured — use directory name
+          }
+
+          const html = generateImpactHtml(target, dependents, {
+            repoName,
+            generatedAt: new Date().toISOString(),
+          });
+          writeFileSync(htmlPath, html, "utf-8");
+          console.log(`HTML report written to ${htmlPath}`);
+        } else if (options.json) {
           console.log(JSON.stringify({ target, dependents }, null, 2));
         } else {
           console.log(formatTree(target, dependents));

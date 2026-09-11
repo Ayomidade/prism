@@ -113,6 +113,9 @@ const symCount = (db.prepare("SELECT COUNT(*) as c FROM symbols").get() as any).
 const edgeCount = (db.prepare("SELECT COUNT(*) as c FROM edges").get() as any).c;
 console.log(`Graph loaded: ${parsed.length} files, ${symCount} symbols, ${edgeCount} edges`);
 db.close();
+// Force immediate exit to prevent better-sqlite3 destructor crash
+// during Node.js process teardown (RemoveEnvironmentCleanupHook assertion).
+process.exit(0);
 
 // ── Helpers (duplicated from build-graph.ts to avoid ts-morph import) ──
 

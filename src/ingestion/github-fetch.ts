@@ -63,5 +63,7 @@ for (const link of links) {
 }
 
 db.close();
+// Force immediate exit to prevent better-sqlite3 destructor crash
+// during Node.js process teardown (RemoveEnvironmentCleanupHook assertion).
+process.exit(0);
 
-process.stdout.write(`GitHub enrichment: ${inserted} PR/issue links for ${shas.length} commits\n`);

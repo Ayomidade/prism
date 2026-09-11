@@ -69,6 +69,61 @@ src/
 
 Every module maps directly to a section of `docs/prism-v1-build-spec.md` — check there before implementing any file.
 
+## Usuage
+Running Tests
+
+### Run all tests (unit + integration)
+```
+npm test
+```
+### Run only unit tests (fast, no init needed)
+```
+npx vitest run test/unit/
+```
+ 
+### Run only the integration test (runs full init pipeline, ~30s)
+```
+npx vitest run test/integration/
+```
+ 
+### Run a specific test file
+```
+npx vitest run test/unit/html.test.ts
+npx vitest run test/unit/query.test.ts
+```
+ 
+### Run tests in watch mode (re-runs on file changes)
+```
+npm run test:watch
+ ```
+### Typecheck
+```
+npm run typecheck
+```
+Running the CLI
+
+### First, index the repo (required before using why/impact)
+```
+npm run dev -- init
+```
+### Then query it
+```
+npm run dev -- why src/store/db.ts:35
+npm run dev -- why --function openDatabase
+npm run dev -- impact buildTemplateSummary
+npm run dev -- impact buildTemplateSummary --json
+npm run dev -- impact buildTemplateSummary --html
+npm run dev -- impact buildTemplateSummary --html report.html
+```
+Or without  npm run dev :
+
+```
+npx tsx src/cli/index.ts init
+npx tsx src/cli/index.ts why src/store/db.ts:35
+npx tsx src/cli/index.ts impact buildTemplateSummary --html
+```
+Note:  prism init  must be run first — it creates  .prism/graph.db  with all the indexed data. The  why  and  impact  commands read from that database.
+
 ## Scope
 
 v1 is exactly three commands: `init`, `why`, `impact`. No AI, no HTML export, no VS Code extension, no runtime tracing. See `docs/mvp-contract.md` for the frozen definition of done.
