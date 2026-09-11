@@ -15,7 +15,7 @@ export function insertFile(db: Database.Database, path: string): number {
     .prepare(
       `INSERT INTO files (path) VALUES (?)
        ON CONFLICT(path) DO UPDATE SET path = excluded.path
-       RETURNING id`
+       RETURNING id`,
     )
     .get(path) as { id: number };
 
@@ -24,11 +24,6 @@ export function insertFile(db: Database.Database, path: string): number {
 
 /**
  * Inserts a symbol (function/class/export/variable) within a file.
- * Not called anywhere yet — Day 3 (AST parsing) is what populates this.
- * Implemented now for interface consistency; no dedup logic yet since
- * re-indexing behavior for symbols/edges is a Day 3 concern (the AST
- * pass will likely need to clear and rebuild a file's symbols wholesale
- * rather than dedup row-by-row).
  */
 export function insertSymbol(
   db: Database.Database,
@@ -36,13 +31,13 @@ export function insertSymbol(
   name: string,
   kind: string,
   startLine: number,
-  endLine: number
+  endLine: number,
 ): number {
   const row = db
     .prepare(
       `INSERT INTO symbols (file_id, name, kind, start_line, end_line)
        VALUES (?, ?, ?, ?, ?)
-       RETURNING id`
+       RETURNING id`,
     )
     .get(fileId, name, kind, startLine, endLine) as { id: number };
 
@@ -50,18 +45,17 @@ export function insertSymbol(
 }
 
 /**
- * Inserts a dependency edge between two symbols. Same Day-3-only caveat
- * as insertSymbol above — not called yet.
+ * Inserts a dependency edge between two symbols.
  */
 export function insertEdge(
   db: Database.Database,
   fromSymbolId: number,
   toSymbolId: number,
-  edgeType: string
+  edgeType: string,
 ): void {
   db.prepare(
     `INSERT INTO edges (from_symbol_id, to_symbol_id, edge_type)
-     VALUES (?, ?, ?)`
+     VALUES (?, ?, ?)`,
   ).run(fromSymbolId, toSymbolId, edgeType);
 }
 
@@ -76,10 +70,10 @@ export function insertCommit(
   sha: string,
   author: string,
   date: string,
-  message: string
+  message: string,
 ): void {
   db.prepare(
     `INSERT OR IGNORE INTO commits (sha, author, date, message)
-     VALUES (?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?)`,
   ).run(sha, author, date, message);
 }
