@@ -476,3 +476,58 @@ Integrated GitHub PR/issue data into the `why` command output.
 6. **`insertFile` dedupes but `insertSymbol`/`insertEdge` don't.** Day 2 added a unique index on `files.path` so `INSERT OR IGNORE` handles re-runs. But `symbols` and `edges` have no unique index — plain INSERT duplicates them on every re-run. The fix for v1: wipe `symbols` and `edges` at the start of `buildGraph` (full re-index model). If incremental indexing is ever needed, unique indexes on `(file_id, name, kind)` and `(from_symbol_id, to_symbol_id, edge_type)` would be the path.
 
 7. **tsx scripts that import ts-morph + better-sqlite3 hang if db opens before project.** The `openDatabase()` call acquires a SQLite lock. If `createProject()` (which loads the full TypeScript compiler via ts-morph) runs afterward, the combination can stall. Always parse files first, then open db for writing. This ordering matters for tsx verification scripts but doesn't affect production code where the pipeline is sequential.
+
+8. **better-sqlite3 crashes during Node.js process teardown.** `Statement::~Statement()` calls `RemoveEnvironmentCleanupHook()` which asserts `env != nullptr`. This fires during GC/exit when Statement objects are still alive — even if you don't call `db.close()`. The fix: never import better-sqlite3 in the same process as ts-morph. The `init` command uses a child-process architecture: main process does git ops (no native addons), `db-write.ts` child writes commits/files, `ast-parse.ts` child does ts-morph, `graph-load.ts` child writes symbols/edges. Each child is a separate process that exits cleanly.
+
+---
+
+## Init Wiring (Day 8)
+
+`prism init` was the last stub. Wired it up with a child-process architecture to handle the native addon conflict.
+
+### Architecture
+```
+prism init (main process)
+├── parseGitLog()         ← no native addons
+├── parseGitBlame()       ← no native addons
+├── spawn: db-write.ts    ← better-sqlite3 only, writes commits + commit_files
+├── spawn: ast-parse.ts   ← ts-morph only, writes .prism/parsed.json
+├── spawn: graph-load.ts  ← better-sqlite3 only, reads JSON, writes symbols + edges
+└── spawn: github-fetch.ts ← Octokit, writes pr_issue_links (optional)
+```
+
+### Why child processes?
+`better-sqlite3` and `ts-morph` both register C++ cleanup hooks via `node::AddEnvironmentCleanupHook`. When both are loaded in the same process, their destructors conflict during Node.js teardown:
+```
+Statement::~Statement()
+  → RemoveEnvironmentCleanupHook()
+    → Assertion failed: (env) != nullptr
+```
+This fires even if you don't call `db.close()` — it happens during GC. Running each dependency in a separate process isolates the crash (each child exits cleanly before its GC runs).
+
+### Files created
+- `src/ingestion/ast-parse.ts` — child process, ts-morph only, outputs JSON
+- `src/ingestion/db-write.ts` — child process, better-sqlite3 only, writes commits/files
+- `src/ingestion/graph-load.ts` — child process, better-sqlite3 only, writes symbols/edges
+- `src/cli/commands/init.ts` — orchestrator, spawns children, no native addons
+
+### Key decisions
+- **No `db.close()`** in any process — let GC handle it; data is flushed via WAL
+- **Test files excluded** from AST parsing — `project.getSourceFile()` returns undefined for files not in tsconfig; filter before parsing
+- **Full re-index** on every `init` — `DELETE FROM edges; DELETE FROM symbols;` at start of graph-load.ts
+
+### End-to-end verified
+```
+prism init → 27 commits, 28 files, 2990 commit_files, 19 parsed, 79 symbols, 52 edges
+prism why src/store/db.ts:35 → documented (1 commit)
+prism why --function openDatabase → documented (1 commit)
+prism impact insertSymbol → 1 dependent (buildGraph)
+```
+
+### TODO (Day 8)
+- [ ] Phase 3: AI context assembly (`prism context`)
+- [ ] Phase 3: Polish, docs, ship
+- [ ] Consider: `--json` output for `prism impact`
+- [ ] Consider: `--depth` flag for `prism impact` BFS
+
+8. **better-sqlite3 crashes during Node.js process teardown.** `Statement::~Statement()` calls `RemoveEnvironmentCleanupHook()` which asserts `env != nullptr`. This fires during GC/exit when Statement objects are still alive — even if you don't call `db.close()`. The fix: never import better-sqlite3 in the same process as ts-morph. The `init` command uses a child-process architecture: main process does git ops (no native addons), `db-write.ts` child writes commits/files, `ast-parse.ts` child does ts-morph, `graph-load.ts` child writes symbols/edges. Each child is a separate process that exits cleanly.
