@@ -1,8 +1,8 @@
-# Day 2 — Build Log (linking.md)
+# Build Log (linking.md)
 
 ## What Was Done
 
-Completed all of Phase 1, Day 2 per `docs/build-plan.md`: git ingestion and SQLite persistence.
+### Day 2 — Git ingestion + SQLite persistence
 
 | Module | File | What it does |
 |--------|------|-------------|
@@ -12,7 +12,15 @@ Completed all of Phase 1, Day 2 per `docs/build-plan.md`: git ingestion and SQLi
 | Repository | `src/store/repository.ts` | `insertFile`, `insertCommit`, `insertSymbol`, `insertEdge` — all working with dedup |
 | Tests | `test/unit/blame.test.ts`, `test/unit/repository.test.ts` | 15 new tests across both files |
 
-**Test suite: 27/27 passing, typecheck clean.**
+### Day 3 — AST parsing + code graph
+
+| Module | File | What it does |
+|--------|------|-------------|
+| AST parser | `src/graph/parser.ts` | `parseSourceFile()` — uses ts-morph to extract symbols + relative imports |
+| Graph builder | `src/graph/build-graph.ts` | `buildGraph()` — inserts module symbols + import edges into SQLite |
+| Tests | `test/unit/parser.test.ts`, `test/unit/build-graph.test.ts` | 13 new tests across both files |
+  
+**Test suite: 39/39 passing, typecheck clean.**
 
 ---
 
@@ -242,6 +250,65 @@ While testing, discovered that `git blame` attributes uncommitted working-tree c
 
 ---
 
+## Day 3 — AST Parsing + Code Graph
+
+### What Was Done
+
+Implemented `src/graph/parser.ts` and `src/graph/build-graph.ts` — the code graph layer that extracts file-level structure (imports/exports) and stores it as module symbols + import edges in SQLite.
+
+### Design: Module Symbols
+
+The `edges` table only supports `from_symbol_id → to_symbol_id` — no file-to-file edge type. Solution: every file gets an implicit **"module" symbol** (kind: `"module"`, spanning the full file). Import edges connect module symbols.
+
+```
+insertFile("src/store/db.ts")       → file row
+insertSymbol(fileId, "src/store/db.ts", "module", 1, 150)  → module symbol
+insertEdge(dbModuleId, schemaModuleId, "imports")           → the actual edge
+```
+
+No schema change needed. Day 4's function/class symbols will sit inside the same file's module symbol, using the same edges table.
+
+### parser.ts — What It Does
+
+Uses `ts-morph` to parse each source file and extract:
+- **Symbols:** top-level functions, classes, named exports (with line ranges)
+- **Imports:** only relative paths (`./foo`, `../bar`) — external packages excluded
+
+Verified against 10 real source files:
+- All relative imports captured correctly (7/7 cross-checks passed)
+- External packages (`better-sqlite3`, `commander`, `ts-morph`, etc.) correctly excluded
+- Line ranges match actual source positions
+- Files with no declarations (e.g., `index.ts`) correctly return 0 symbols
+
+### build-graph.ts — What It Does
+
+Two-pass approach:
+1. **First pass:** insert all files + module symbols (need the IDs for edge creation)
+2. **Second pass:** resolve each relative import to an actual file path, insert import edge
+
+Import resolution handles TypeScript's common patterns:
+- `.js` → `.ts` (TypeScript source uses .js extensions)
+- Bare path → `index.ts` (folder imports)
+- `.jsx` → `.tsx`
+
+7/7 resolution tests passed against this repo's actual imports.
+
+### Gotcha: blame tests and uncommitted changes
+
+The blame test that checks "single-commit files" kept failing because it used `schema.ts` — which we'd modified but not committed. Git blame attributes uncommitted changes to SHA `00000000`, which broke the "all lines from 1 commit" assertion. Fixed by switching to `db.ts` (created in one commit, never modified). Lesson: **test files that won't change under you** — pick stable, committed files for assertions about specific commit counts.
+
+### Gotcha: better-sqlite3 + ts-morph native addon conflict in vitest
+
+**The problem:** `build-graph.ts` imports both `ts-morph` (via `parser.ts`) and `better-sqlite3` (via `repository.ts`). Both are native C++ addons that register cleanup hooks with the Node.js environment. When vitest tears down its worker process, the `Statement::~Statement()` destructor tries to call `RemoveEnvironmentCleanupHook`, but the environment is already gone. This crashes the worker before test results can be reported.
+
+**What works:** Every other test file (db, log, blame, repository, parser) runs fine in vitest — they each import only ONE native addon. The crash only happens when BOTH are loaded in the same worker.
+
+**The fix for tests:** `build-graph.test.ts` uses hand-built `ParsedFile[]` fixtures instead of running the real parser. Since `build-graph.ts` only imports `ParsedFile` as a **type** (`import type { ParsedFile }`), TypeScript strips it at compile time — ts-morph never loads at runtime. This completely sidesteps the native addon conflict while still testing all of buildGraph's actual logic (file insertion, module symbols, import resolution, edge creation, re-run dedup).
+
+**Vitest config:** `vitest.config.ts` uses `pool: "forks"` (separate processes, not threads) to avoid the thread-level cleanup race for other native addon combinations.
+
+---
+
 ## Key Takeaways for Future Work
 
 1. **Always test against a real repo with real history.** The 1MB default `maxBuffer` bug would have been invisible on the scaffold project but fatal on any production codebase.
@@ -253,3 +320,7 @@ While testing, discovered that `git blame` attributes uncommitted working-tree c
 4. **Stateful line-by-line parsing is more robust than split-then-process** for structured output that doesn't have clean record boundaries.
 
 5. **`%s` only captures the subject line, not the full commit body.** If `why` output feels thin for commits with detailed messages, switch to `%B` (full body). But `%B` contains literal newlines, so the parsing strategy would need to change — the body would span multiple lines between the header and the next numstat block, and would need a different termination signal (e.g., detect the next header line). Not needed for v1, but worth knowing where to look.
+
+6. **`insertFile` dedupes but `insertSymbol`/`insertEdge` don't.** Day 2 added a unique index on `files.path` so `INSERT OR IGNORE` handles re-runs. But `symbols` and `edges` have no unique index — plain INSERT duplicates them on every re-run. The fix for v1: wipe `symbols` and `edges` at the start of `buildGraph` (full re-index model). If incremental indexing is ever needed, unique indexes on `(file_id, name, kind)` and `(from_symbol_id, to_symbol_id, edge_type)` would be the path.
+
+7. **tsx scripts that import ts-morph + better-sqlite3 hang if db opens before project.** The `openDatabase()` call acquires a SQLite lock. If `createProject()` (which loads the full TypeScript compiler via ts-morph) runs afterward, the combination can stall. Always parse files first, then open db for writing. This ordering matters for tsx verification scripts but doesn't affect production code where the pipeline is sequential.

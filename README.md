@@ -13,9 +13,9 @@ No code leaves your machine. No server, no account, no cloud dependency required
 
 ## Status
 
-🚧 **Phase 1, Day 2 complete.** Git ingestion (log + blame) and the SQLite persistence layer are implemented and tested. The store layer (`db.ts`, `schema.ts`, `repository.ts`) is fully working with schema versioning and dedup. See `linking.md` for a detailed build log of what was done, bugs encountered, and lessons learned.
+🚧 **Phase 1, Day 3 complete.** Git ingestion (Day 2) + AST parsing + code graph (Day 3) are implemented and tested. The full pipeline — parse source files, extract imports/exports, store module symbols and import edges in SQLite — is working. See `linking.md` for a detailed build log.
 
-**Next up:** Day 3 — AST parsing + code graph construction (`graph/parser.ts`, `graph/build-graph.ts`).
+**Next up:** Day 4 — function/symbol-level call resolution (who calls whom inside a function body).
 
 ## Planning Docs
 
