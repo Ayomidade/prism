@@ -122,7 +122,7 @@ export function queryHistoryForLocation(
 ): HistoryEntry[] {
   const rows = db
     .prepare(
-      `SELECT c.sha as commitSha, c.message, c.date, c.author
+      `SELECT DISTINCT c.sha as commitSha, c.message, c.date, c.author
        FROM commit_files cf
        JOIN commits c ON cf.commit_sha = c.sha
        JOIN files f ON cf.file_id = f.id
@@ -159,7 +159,7 @@ export function queryHistoryForFunction(
 
   const rows = db
     .prepare(
-      `SELECT c.sha as commitSha, c.message, c.date, c.author
+      `SELECT DISTINCT c.sha as commitSha, c.message, c.date, c.author
        FROM commit_files cf
        JOIN commits c ON cf.commit_sha = c.sha
        WHERE cf.file_id = ?
