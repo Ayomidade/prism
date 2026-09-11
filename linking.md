@@ -419,6 +419,48 @@ Implemented the second graph-traversal command: `prism impact <symbol>`.
 
 ---
 
+## Day 7 — GitHub API integration
+
+### What we built
+
+Integrated GitHub PR/issue data into the `why` command output.
+
+**tokens.ts** — Token storage:
+- `getGitHubToken()` checks (1) `PRISM_GITHUB_TOKEN` env var, (2) `~/.config/prism/token` file
+- `setGitHubToken()` writes to `~/.config/prism/token` with mode 0o600
+- Simple file-based storage for v1. OS keychain is a post-v1 enhancement
+
+**pr-issue-link.ts** — GitHub API integration:
+- `linkCommitsToPrsAndIssues(client, commitShas)` — batch fetches PR associations for commits via `listPullRequestsAssociatedWithCommit`. Rate-limit aware (stops at <10 remaining). Capped at 200 commits max
+- `fetchPrDetails(client, prNumbers)` — fetches PR title+body for specific PR numbers
+- Owner/repo resolved from env vars (`PRISM_GITHUB_OWNER`, `PRISM_GITHUB_REPO`) or git remote URL
+- PR body truncated to 500 chars for storage
+
+**repository.ts** — new `insertPrIssueLink()` function (INSERT OR IGNORE)
+
+**query.ts** — History queries now include PR/issue data:
+- `HistoryEntry` gains `prNumbers: number[]` and `prTitles: string[]`
+- `enrichWithPrData()` helper batch-queries `pr_issue_links` table and merges into results
+- Both `queryHistoryForLocation` and `queryHistoryForFunction` use enrichment
+
+**template.ts** — PR info in output:
+- Shows `PR #42: Title` below each commit when available
+- Falls back to `PR #99` when title is missing
+
+**Test coverage:**
+- `template.test.ts`: 2 new tests (PR number+title display, PR without title)
+- **80/80 total tests pass**
+
+### Design decisions
+
+- **Env vars override file storage:** `PRISM_GITHUB_TOKEN` takes precedence over `~/.config/prism/token`. This supports both CI (env vars) and local dev (config file)
+- **Rate limit safety:** Stops PR lookups when remaining API calls < 10, returning partial results. No data loss — incomplete enrichment is better than a crash
+- **200 commit cap:** Prevents rate-limit exhaustion on large histories. The most recent 200 commits are typically the most relevant
+- **PR body truncation at 500 chars:** Avoids storing huge PR descriptions that would bloat the database. The title is usually sufficient for context
+- **No re-fetching in `why`:** PR data is fetched once during `init` and stored in `pr_issue_links`. The `why` command reads from the database, not the API. This keeps `why` fast and offline-capable
+
+---
+
 ## Key Takeaways for Future Work
 
 1. **Always test against a real repo with real history.** The 1MB default `maxBuffer` bug would have been invisible on the scaffold project but fatal on any production codebase.

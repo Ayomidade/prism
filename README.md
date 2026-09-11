@@ -13,9 +13,9 @@ No code leaves your machine. No server, no account, no cloud dependency required
 
 ## Status
 
-🚧 **Phase 2, Day 6 complete.** `prism impact` command implemented — reverse dependency traversal with BFS, `file:symbol` disambiguation, terminal tree output and `--json` mode. Both `prism why` and `prism impact` are now functional. 78/78 tests passing. See `linking.md` for a detailed build log.
+🚧 **Phase 2 complete (Days 4-7).** GitHub API integration done — token storage, PR/issue linking, and `why` output enrichment. All three CLI commands (`init` stubs, `why`, `impact`) are implemented. 80/80 tests passing. See `linking.md` for a detailed build log.
 
-**Next up:** Day 7 — GitHub API integration (fetch linked PRs/issues for commits).
+**Next up:** Phase 3 — AI summarization, HTML export, error handling, and deployment.
 
 ## Planning Docs
 
