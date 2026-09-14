@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { openDatabase } from "../../store/db.js";
+import { openDatabase, getDbPath } from "../../store/db.js";
 import { resolveSymbol, queryDependents, listSymbolsByName } from "../../graph/query.js";
 import { existsSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
@@ -69,7 +69,15 @@ export function registerImpactCommand(program: Command): void {
     .option("--json", "Output as JSON instead of a tree")
     .option("--html [path]", "Export as a standalone HTML report (default: impact-report.html)")
     .action(async (symbol: string, options: { json?: boolean; html?: string | boolean }) => {
-      const dbPath = ".prism/graph.db";
+      let repoRoot: string;
+      try {
+        repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+      } catch {
+        console.error("Error: Not inside a git repository.");
+        process.exit(1);
+      }
+
+      const dbPath = getDbPath(repoRoot);
       if (!existsSync(dbPath)) {
         console.error("Error: No indexed data found. Run `prism init` first.");
         process.exit(1);
@@ -125,7 +133,8 @@ export function registerImpactCommand(program: Command): void {
           console.log(formatTree(target, dependents));
         }
       } finally {
-        db.close();
+        // Don't call db.close() — better-sqlite3 crashes during Node.js
+        // process teardown. Data is flushed via WAL; GC handles cleanup.
       }
     });
 }

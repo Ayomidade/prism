@@ -9,7 +9,7 @@
 
 export interface WhyResult {
   summary: string;
-  confidence: "documented" | "ai-inferred";
+  confidence: "documented" | "ai-inferred" | "none";
   commits: Array<{ sha: string; message: string; date: string }>;
 }
 

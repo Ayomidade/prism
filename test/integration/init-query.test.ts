@@ -17,8 +17,9 @@ import {
 // workers when both are loaded in the same process. The test process only
 // imports better-sqlite3 (via openDatabase + query functions).
 //
-// The CLI writes to .prism/graph.db by default. The test reads from that
-// location and cleans it up after all tests run.
+// NOTE: We never call db.close() — better-sqlite3's destructor crashes
+// during Node.js process teardown (RemoveEnvironmentCleanupHook assertion).
+// Data is already flushed via WAL; GC handles cleanup.
 
 const DB_PATH = ".prism/graph.db";
 const REPO_ROOT = ".";
@@ -62,28 +63,24 @@ describe("init pipeline (integration)", () => {
     expect(tableNames).toContain("commits");
     expect(tableNames).toContain("commit_files");
     expect(tableNames).toContain("meta");
-    db.close();
   });
 
   it("indexes commits from the repo", () => {
     const db = openDatabase(DB_PATH);
     const count = db.prepare("SELECT COUNT(*) as c FROM commits").get() as { c: number };
     expect(count.c).toBeGreaterThan(5);
-    db.close();
   });
 
   it("indexes source files", () => {
     const db = openDatabase(DB_PATH);
     const count = db.prepare("SELECT COUNT(*) as c FROM files").get() as { c: number };
     expect(count.c).toBeGreaterThan(10);
-    db.close();
   });
 
   it("indexes symbols from AST parsing", () => {
     const db = openDatabase(DB_PATH);
     const count = db.prepare("SELECT COUNT(*) as c FROM symbols").get() as { c: number };
     expect(count.c).toBeGreaterThan(20);
-    db.close();
   });
 
   it("builds edges (imports + calls)", () => {
@@ -97,14 +94,12 @@ describe("init pipeline (integration)", () => {
 
     expect(importEdges.c).toBeGreaterThan(3);
     expect(callEdges.c).toBeGreaterThan(5);
-    db.close();
   });
 
   it("populates commit_files from git blame", () => {
     const db = openDatabase(DB_PATH);
     const count = db.prepare("SELECT COUNT(*) as c FROM commit_files").get() as { c: number };
     expect(count.c).toBeGreaterThan(100);
-    db.close();
   });
 });
 
@@ -118,14 +113,12 @@ describe("why queries (integration)", () => {
     expect(history[0].message.length).toBeGreaterThan(0);
     expect(history[0].date.length).toBeGreaterThan(0);
     expect(history[0].author.length).toBeGreaterThan(0);
-    db.close();
   });
 
   it("returns empty for a line that was never touched", () => {
     const db = openDatabase(DB_PATH);
     const history = queryHistoryForLocation(db, "src/store/db.ts", 99999);
     expect(history).toEqual([]);
-    db.close();
   });
 
   it("returns history for a known function name", () => {
@@ -133,25 +126,21 @@ describe("why queries (integration)", () => {
     const history = queryHistoryForFunction(db, "openDatabase");
     expect(history.length).toBeGreaterThan(0);
     expect(history[0].commitSha).toMatch(/^[0-9a-f]{40}$/);
-    db.close();
   });
 
   it("returns empty for a non-existent function", () => {
     const db = openDatabase(DB_PATH);
     const history = queryHistoryForFunction(db, "functionThatDoesNotExist");
     expect(history).toEqual([]);
-    db.close();
   });
 
   it("returns most recent commits first for a multi-commit function", () => {
     const db = openDatabase(DB_PATH);
-    // buildTemplateSummary was modified across 3 commits — test ordering
     const history = queryHistoryForFunction(db, "buildTemplateSummary");
     expect(history.length).toBeGreaterThanOrEqual(2);
     for (let i = 0; i < history.length - 1; i++) {
       expect(history[i].date >= history[i + 1].date).toBe(true);
     }
-    db.close();
   });
 });
 
@@ -163,7 +152,6 @@ describe("impact queries (integration)", () => {
     expect(sym!.name).toBe("openDatabase");
     expect(sym!.file).toBe("src/store/db.ts");
     expect(sym!.kind).toBe("function");
-    db.close();
   });
 
   it("resolves a symbol by file:name format", () => {
@@ -172,19 +160,16 @@ describe("impact queries (integration)", () => {
     expect(sym).not.toBeNull();
     expect(sym!.name).toBe("openDatabase");
     expect(sym!.file).toBe("src/store/db.ts");
-    db.close();
   });
 
   it("returns null for an unknown symbol", () => {
     const db = openDatabase(DB_PATH);
     const sym = resolveSymbol(db, "nonexistentFunction12345");
     expect(sym).toBeNull();
-    db.close();
   });
 
   it("finds cross-file dependents of a symbol", () => {
     const db = openDatabase(DB_PATH);
-    // buildTemplateSummary is called by registerWhyCommand (cross-file)
     const sym = resolveSymbol(db, "buildTemplateSummary");
     expect(sym).not.toBeNull();
     expect(sym!.file).toBe("src/summarize/template.ts");
@@ -199,18 +184,15 @@ describe("impact queries (integration)", () => {
       expect(dep.symbol.length).toBeGreaterThan(0);
       expect(dep.depth).toBeGreaterThanOrEqual(1);
     }
-    db.close();
   });
 
   it("returns empty dependents for a leaf function", () => {
     const db = openDatabase(DB_PATH);
-    // getDbPath is only called externally, no internal callers in the call graph
     const sym = resolveSymbol(db, "getDbPath");
     expect(sym).not.toBeNull();
 
     const deps = queryDependents(db, sym!.id);
     expect(Array.isArray(deps)).toBe(true);
-    db.close();
   });
 
   it("listSymbolsByName returns matches for known names", () => {
@@ -219,6 +201,5 @@ describe("impact queries (integration)", () => {
     expect(matches.length).toBeGreaterThan(0);
     const repoMatch = matches.find((m) => m.file === "src/store/repository.ts");
     expect(repoMatch).toBeDefined();
-    db.close();
   });
 });

@@ -1,11 +1,12 @@
 import type { Command } from "commander";
-import { openDatabase } from "../../store/db.js";
+import { openDatabase, getDbPath } from "../../store/db.js";
 import { queryHistoryForLocation, queryHistoryForFunction } from "../../graph/query.js";
-import { buildTemplateSummary, buildTemplateSummaryJson } from "../../summarize/template.js";
+import { createTemplateSummarizer } from "../../summarize/template.js";
 import { createAiSummarizer } from "../../summarize/ai.js";
 import { getAnthropicKey } from "../../config/tokens.js";
 import type { Summarizer } from "../../summarize/types.js";
 import { existsSync } from "node:fs";
+import { execSync } from "node:child_process";
 
 // Build spec: docs/prism-v1-build-spec.md Section 5 (`prism why`)
 //
@@ -34,7 +35,15 @@ export function registerWhyCommand(program: Command): void {
     .option("--function <name>", "Look up by function name instead of file:line")
     .option("--json", "Output as JSON instead of formatted text")
     .action(async (location: string | undefined, options: { function?: string; json?: boolean }) => {
-      const dbPath = ".prism/graph.db";
+      let repoRoot: string;
+      try {
+        repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+      } catch {
+        console.error("Error: Not inside a git repository.");
+        process.exit(1);
+      }
+
+      const dbPath = getDbPath(repoRoot);
       if (!existsSync(dbPath)) {
         console.error("Error: No indexed data found. Run `prism init` first.");
         process.exit(1);
@@ -46,7 +55,7 @@ export function registerWhyCommand(program: Command): void {
       const anthropicKey = getAnthropicKey();
       const summarizer: Summarizer = anthropicKey
         ? await createAiSummarizer(anthropicKey)
-        : { summarize: async (h, t) => ({ text: buildTemplateSummary(h, t), confidence: "documented" as const }), summarizeJson: async (h, t) => buildTemplateSummaryJson(h, t) };
+        : createTemplateSummarizer();
 
       try {
         let history;
@@ -70,6 +79,7 @@ export function registerWhyCommand(program: Command): void {
         } else {
           console.error("Error: Provide a location (file:line) or use --function <name>.");
           program.help();
+          process.exit(1);
         }
 
         if (options.json) {
@@ -80,7 +90,8 @@ export function registerWhyCommand(program: Command): void {
           console.log(result.text);
         }
       } finally {
-        db.close();
+        // Don't call db.close() — better-sqlite3 crashes during Node.js
+        // process teardown. Data is flushed via WAL; GC handles cleanup.
       }
     });
 }

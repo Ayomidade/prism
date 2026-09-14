@@ -67,7 +67,6 @@ describe("queryHistoryForLocation", () => {
     expect(history).toHaveLength(2);
     expect(history[0].commitSha).toBe("bbb2222"); // most recent first
     expect(history[1].commitSha).toBe("aaa1111");
-    db.close();
   });
 
   it("returns empty array for a line with no history", () => {
@@ -77,7 +76,6 @@ describe("queryHistoryForLocation", () => {
     // Line 100 of a.ts was never touched
     const history = queryHistoryForLocation(db, "src/a.ts", 100);
     expect(history).toEqual([]);
-    db.close();
   });
 
   it("returns empty array for a file that doesn't exist in the database", () => {
@@ -86,7 +84,6 @@ describe("queryHistoryForLocation", () => {
 
     const history = queryHistoryForLocation(db, "src/missing.ts", 1);
     expect(history).toEqual([]);
-    db.close();
   });
 
   it("includes commit metadata (message, date, author)", () => {
@@ -120,7 +117,6 @@ describe("queryHistoryForLocation", () => {
     const history51 = queryHistoryForLocation(db, "src/a.ts", 51);
     expect(history51).toHaveLength(1);
     expect(history51[0].commitSha).toBe("aaa1111");
-    db.close();
   });
 });
 
@@ -135,7 +131,6 @@ describe("queryHistoryForFunction", () => {
     expect(history).toHaveLength(2);
     expect(history[0].commitSha).toBe("bbb2222");
     expect(history[1].commitSha).toBe("aaa1111");
-    db.close();
   });
 
   it("returns empty array for an unknown function name", () => {
@@ -144,7 +139,6 @@ describe("queryHistoryForFunction", () => {
 
     const history = queryHistoryForFunction(db, "nonexistent");
     expect(history).toEqual([]);
-    db.close();
   });
 
   it("skips module symbols when looking up by name", () => {
@@ -160,7 +154,6 @@ describe("queryHistoryForFunction", () => {
     // "src/a.ts" as a name should not match the module symbol
     const history = queryHistoryForFunction(db, "src/a.ts");
     expect(history).toEqual([]);
-    db.close();
   });
 
   it("resolves checkSchemaVersion correctly (line 55-70)", () => {
@@ -173,7 +166,6 @@ describe("queryHistoryForFunction", () => {
     expect(history).toHaveLength(2);
     expect(history[0].commitSha).toBe("ccc3333"); // most recent
     expect(history[1].commitSha).toBe("aaa1111");
-    db.close();
   });
 });
 
@@ -188,7 +180,6 @@ describe("resolveSymbol", () => {
     expect(sym).not.toBeNull();
     expect(sym!.name).toBe("helper");
     expect(sym!.file).toBe("src/b.ts");
-    db.close();
   });
 
   it("returns null for an unknown symbol", () => {
@@ -196,7 +187,6 @@ describe("resolveSymbol", () => {
     seedDb(db);
 
     expect(resolveSymbol(db, "nonexistent")).toBeNull();
-    db.close();
   });
 
   it("returns null for an ambiguous symbol (multiple matches)", () => {
@@ -210,7 +200,6 @@ describe("resolveSymbol", () => {
     ).run(fileIdA.id, "helper", "function", 1, 5);
 
     expect(resolveSymbol(db, "helper")).toBeNull();
-    db.close();
   });
 
   it("resolves by file:name format", () => {
@@ -226,7 +215,6 @@ describe("resolveSymbol", () => {
     expect(sym).not.toBeNull();
     expect(sym!.file).toBe("src/a.ts");
     expect(sym!.name).toBe("helper");
-    db.close();
   });
 
   it("skips module symbols", () => {
@@ -243,7 +231,6 @@ describe("resolveSymbol", () => {
 
     // "src/a.ts" as a symbol name should not resolve to the module symbol
     expect(resolveSymbol(db, "src/a.ts")).toBeNull();
-    db.close();
   });
 });
 
@@ -260,7 +247,6 @@ describe("listSymbolsByName", () => {
     const matches = listSymbolsByName(db, "helper");
     expect(matches).toHaveLength(2);
     expect(matches.map((m) => m.file).sort()).toEqual(["src/a.ts", "src/b.ts"]);
-    db.close();
   });
 
   it("returns empty array for unknown name", () => {
@@ -268,7 +254,6 @@ describe("listSymbolsByName", () => {
     seedDb(db);
 
     expect(listSymbolsByName(db, "nonexistent")).toEqual([]);
-    db.close();
   });
 });
 
@@ -312,7 +297,6 @@ describe("queryDependents", () => {
     expect(deps).toHaveLength(2);
     expect(deps.map((d) => d.symbol).sort()).toEqual(["helper", "main"]);
     expect(deps.every((d) => d.depth === 1)).toBe(true);
-    db.close();
   });
 
   it("finds transitive dependents (depth > 1)", () => {
@@ -323,7 +307,6 @@ describe("queryDependents", () => {
     const deps = queryDependents(db, ids.helper);
     expect(deps).toHaveLength(1);
     expect(deps[0]).toEqual({ file: "src/graph.ts", symbol: "main", depth: 1 });
-    db.close();
   });
 
   it("returns empty for a symbol nobody depends on", () => {
@@ -333,7 +316,6 @@ describe("queryDependents", () => {
     // Nobody calls main
     const deps = queryDependents(db, ids.main);
     expect(deps).toEqual([]);
-    db.close();
   });
 
   it("respects maxDepth", () => {
@@ -346,7 +328,6 @@ describe("queryDependents", () => {
     const deps = queryDependents(db, ids.utils, 1);
     expect(deps).toHaveLength(2);
     expect(deps.every((d) => d.depth <= 1)).toBe(true);
-    db.close();
   });
 
   it("handles cycles without infinite loop", () => {
@@ -375,6 +356,5 @@ describe("queryDependents", () => {
     expect(depsB).toHaveLength(1); // a depends on b
     expect(depsA[0].symbol).toBe("b");
     expect(depsB[0].symbol).toBe("a");
-    db.close();
   });
 });

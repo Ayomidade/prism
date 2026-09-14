@@ -18,7 +18,6 @@ describe("insertFile", () => {
     const id1 = insertFile(db, "src/store/db.ts");
     const id2 = insertFile(db, "src/store/db.ts");
     expect(id1).toBe(id2);
-    db.close();
   });
 
   it("does not create duplicate rows for the same path", () => {
@@ -29,7 +28,6 @@ describe("insertFile", () => {
 
     const count = db.prepare("SELECT COUNT(*) as c FROM files").get() as { c: number };
     expect(count.c).toBe(1);
-    db.close();
   });
 
   it("gives different paths different ids", () => {
@@ -37,7 +35,6 @@ describe("insertFile", () => {
     const id1 = insertFile(db, "src/store/db.ts");
     const id2 = insertFile(db, "src/store/schema.ts");
     expect(id1).not.toBe(id2);
-    db.close();
   });
 });
 
@@ -52,7 +49,6 @@ describe("insertCommit", () => {
 
     expect(row?.author).toBe("Jane Doe");
     expect(row?.message).toBe("Initial commit");
-    db.close();
   });
 
   it("ignores re-inserting the same sha instead of erroring", () => {
@@ -66,7 +62,6 @@ describe("insertCommit", () => {
 
     const count = db.prepare("SELECT COUNT(*) as c FROM commits").get() as { c: number };
     expect(count.c).toBe(1);
-    db.close();
   });
 });
 
@@ -82,7 +77,6 @@ describe("insertSymbol / insertEdge", () => {
 
     expect(row?.name).toBe("openDatabase");
     expect(row?.kind).toBe("function");
-    db.close();
   });
 
   it("inserts an edge between two symbols", () => {
@@ -99,6 +93,5 @@ describe("insertSymbol / insertEdge", () => {
 
     expect(row?.to_symbol_id).toBe(toId);
     expect(row?.edge_type).toBe("calls");
-    db.close();
   });
 });

@@ -60,7 +60,6 @@ describe("buildGraph", () => {
 
     expect(fileCount).toBe(3);
     expect(moduleCount).toBe(3);
-    db.close();
   });
 
   it("resolves relative imports to the correct target file, including ../ paths", () => {
@@ -82,7 +81,6 @@ describe("buildGraph", () => {
     expect(edges).toHaveLength(2);
     expect(edges).toContainEqual({ from_path: "src/a.ts", to_path: "src/b.ts", edge_type: "imports" });
     expect(edges).toContainEqual({ from_path: "src/sub/c.ts", to_path: "src/a.ts", edge_type: "imports" });
-    db.close();
   });
 
   it("silently skips imports that don't resolve to a real file, without throwing", () => {
@@ -97,7 +95,6 @@ describe("buildGraph", () => {
 
     expect(fileCount).toBe(4); // d.ts itself still gets a file + module symbol
     expect(edgeCount).toBe(2); // but no edge for the dangling import
-    db.close();
   });
 
   it("does not duplicate symbols or edges when run multiple times (repeat prism init)", () => {
@@ -118,7 +115,6 @@ describe("buildGraph", () => {
     expect(fileCount).toBe(3);
     expect(moduleCount).toBe(3);
     expect(edgeCount).toBe(2);
-    db.close();
   });
 
   it("reflects a changed import graph after re-running with different input", () => {
@@ -144,7 +140,6 @@ describe("buildGraph", () => {
 
     // only c.ts -> a.ts should remain; a.ts -> b.ts can no longer resolve
     expect(edgeCount).toBe(1);
-    db.close();
   });
 
   // ── Day 4: symbol persistence + call resolution ──────────────────────
@@ -172,7 +167,6 @@ describe("buildGraph", () => {
       { name: "doStuff", kind: "function" },
       { name: "src/b.ts", kind: "module" },
     ]);
-    db.close();
   });
 
   it("creates a calls edge for a locally declared function", () => {
@@ -201,7 +195,6 @@ describe("buildGraph", () => {
 
     expect(callEdges).toHaveLength(1);
     expect(callEdges[0]).toEqual({ from_name: "main", to_name: "helper", edge_type: "calls" });
-    db.close();
   });
 
   it("creates a calls edge for an imported function", () => {
@@ -244,7 +237,6 @@ describe("buildGraph", () => {
       from_name: "main", to_name: "helper",
       from_file: "src/b.ts", to_file: "src/a.ts",
     });
-    db.close();
   });
 
   it("does not create calls edges for external package calls", () => {
@@ -265,7 +257,6 @@ describe("buildGraph", () => {
       .get() as { c: number };
 
     expect(callEdges.c).toBe(0);
-    db.close();
   });
 
   it("does not create calls edge when callee name is ambiguous across files", () => {
@@ -301,6 +292,5 @@ describe("buildGraph", () => {
       .get() as { c: number };
 
     expect(callEdges.c).toBe(0); // ambiguous -- skip resolution
-    db.close();
   });
 });

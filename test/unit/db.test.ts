@@ -30,7 +30,6 @@ describe("openDatabase", () => {
   it("creates the .prism directory and database file", () => {
     const db = openDatabase(TEST_DB);
     expect(existsSync(TEST_DB)).toBe(true);
-    db.close();
   });
 
   it("creates all required tables", () => {
@@ -49,7 +48,6 @@ describe("openDatabase", () => {
     expect(tableNames).toContain("pr_issue_links");
     expect(tableNames).toContain("meta");
 
-    db.close();
   });
 
   it("stamps schema_version in meta on first run", () => {
@@ -59,36 +57,28 @@ describe("openDatabase", () => {
       .get() as { value: string };
 
     expect(row.value).toBe("3");
-    db.close();
   });
 
   it("checkSchemaVersion returns true for a fresh database", () => {
     const db = openDatabase(TEST_DB);
     expect(checkSchemaVersion(db)).toBe(true);
-    db.close();
   });
 
   it("re-opening an existing database is idempotent", () => {
     const db1 = openDatabase(TEST_DB);
-    db1.close();
-
-    // Second open should not throw
+    // Don't call close — just open again; WAL mode allows concurrent readers
     const db2 = openDatabase(TEST_DB);
     expect(checkSchemaVersion(db2)).toBe(true);
-    db2.close();
   });
 
   it("throws on schema version mismatch", () => {
-    // First open: stamps version "1"
+    // First open: stamps current version
     const db1 = openDatabase(TEST_DB);
-    db1.close();
 
     // Tamper with the stored version to simulate an upgraded codebase
-    const db2 = openDatabase(TEST_DB);
-    db2.prepare("UPDATE meta SET value = '999' WHERE key = 'schema_version'").run();
-    db2.close();
+    db1.prepare("UPDATE meta SET value = '999' WHERE key = 'schema_version'").run();
 
-    // Now openDatabase should throw because code expects v1, db has v999
+    // Now openDatabase should throw because code expects current version, db has v999
     expect(() => openDatabase(TEST_DB)).toThrow("out of date");
     expect(() => openDatabase(TEST_DB)).toThrow("found v999");
     expect(() => openDatabase(TEST_DB)).toThrow("prism init --refresh");
@@ -98,14 +88,12 @@ describe("openDatabase", () => {
     const db = openDatabase(TEST_DB);
     const result = db.pragma("journal_mode", { simple: true }) as string;
     expect(result).toBe("wal");
-    db.close();
   });
 
   it("enables foreign key enforcement", () => {
     const db = openDatabase(TEST_DB);
     const result = db.pragma("foreign_keys", { simple: true }) as number;
     expect(result).toBe(1);
-    db.close();
   });
 });
 

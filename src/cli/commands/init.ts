@@ -77,7 +77,7 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
   // 6. AST parsing (child process — ts-morph only)
   console.log("  Parsing AST...");
   const fileList = trackedFiles.join("\n");
-  const parsedJson = join(".prism", "parsed.json");
+  const parsedJson = join(repoRoot, ".prism", "parsed.json");
   try {
     execFileSync(
       "npx",
