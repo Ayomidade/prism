@@ -25,6 +25,7 @@ export interface ParsedFile {
   symbols: ParsedSymbol[];
   imports: string[]; // resolved relative paths only — external packages excluded
   namedImports: NamedImport[]; // named imports with source tracking (for call resolution)
+  moduleCalls: string[]; // calls made from top-level script code (not inside any named function/class)
 }
 
 export function parseSourceFile(project: Project, filePath: string): ParsedFile {
@@ -99,12 +100,30 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
     }
   }
 
+  // Top-level statements — anything not already captured as a function,
+  // class, or import/export declaration. Subprocess entry-point scripts
+  // (graph-load.ts, db-write.ts, etc.) run as top-level code, so calls
+  // here would otherwise be invisible to the call graph.
+  const capturedKinds = new Set([
+    SyntaxKind.FunctionDeclaration,
+    SyntaxKind.ClassDeclaration,
+    SyntaxKind.ExportDeclaration,
+    SyntaxKind.ImportDeclaration,
+  ]);
+
+  const moduleCalls: string[] = [];
+  for (const statement of sourceFile.getStatements()) {
+    if (capturedKinds.has(statement.getKind())) continue;
+    moduleCalls.push(...collectCalls(statement));
+  }
+
   return {
     path: filePath,
     lineCount: sourceFile.getEndLineNumber(),
     symbols,
     imports,
     namedImports,
+    moduleCalls,
   };
 }
 

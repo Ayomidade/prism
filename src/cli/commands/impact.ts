@@ -20,7 +20,7 @@ import type { Dependent } from "../../graph/query.js";
  * Output looks like:
  *   src/cli/index.ts
  *     registerCommands
- *   src/graph/build-graph.ts
+ *   src/graph/query.ts
  *     buildGraph
  *       resolveImport
  */

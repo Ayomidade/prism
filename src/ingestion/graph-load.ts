@@ -30,6 +30,7 @@ interface ParsedFileJson {
   symbols: ParsedSym[];
   imports: string[];
   namedImports: ParsedNamedImport[];
+  moduleCalls: string[];
 }
 
 const [repoRoot, jsonPath, dbPath] = process.argv.slice(2);
@@ -69,11 +70,13 @@ for (const file of parsed) {
     const resolved = resolveImport(ni.source, file.path, repoRoot);
     if (!resolved) continue;
     for (const name of ni.names) {
-      if (importNameToFile.has(name)) {
-        importNameToFile.set(name, ""); // ambiguous
-      } else {
+      const existing = importNameToFile.get(name);
+      if (existing !== undefined && existing !== resolved) {
+        importNameToFile.set(name, ""); // ambiguous — same name from different files
+      } else if (existing === undefined) {
         importNameToFile.set(name, resolved);
       }
+      // else: same name, same resolution — keep it
     }
   }
 }
@@ -92,8 +95,17 @@ for (const file of parsed) {
     insertEdge(db, fromModuleId, toModuleId, "imports");
   }
 
-  // Call edges
+  // Module-level call edges — top-level script code isn't inside any
+  // named function, so it's attributed to the file's own module symbol.
   const localSymbols = fileSymbolNames.get(file.path);
+  for (const calleeName of file.moduleCalls ?? []) {
+    const toSymId = resolveCallTarget(calleeName, localSymbols ?? new Map(), importNameToFile, fileSymbolNames);
+    if (toSymId) {
+      insertEdge(db, fromModuleId, toSymId, "calls");
+    }
+  }
+
+  // Call edges
   if (!localSymbols) continue;
 
   for (const sym of file.symbols) {
@@ -117,7 +129,7 @@ db.close();
 // during Node.js process teardown (RemoveEnvironmentCleanupHook assertion).
 process.exit(0);
 
-// ── Helpers (duplicated from build-graph.ts to avoid ts-morph import) ──
+// ── Helpers ──
 
 function resolveCallTarget(
   calleeName: string,

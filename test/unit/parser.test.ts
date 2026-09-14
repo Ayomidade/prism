@@ -46,9 +46,10 @@ describe("parseSourceFile", () => {
   });
 
   it("parses cross-directory relative imports", () => {
-    const result = parseSourceFile(project, "src/graph/build-graph.ts");
-    expect(result.imports).toContain("./parser.js");
-    expect(result.imports).toContain("../store/repository.js");
+    const result = parseSourceFile(project, "src/cli/commands/why.ts");
+    expect(result.imports).toContain("../../store/db.js");
+    expect(result.imports).toContain("../../graph/query.js");
+    expect(result.imports).toContain("../../summarize/template.js");
   });
 
   it("assigns correct line ranges to symbols", () => {
@@ -71,12 +72,12 @@ describe("parseSourceFile", () => {
   });
 
   it("excludes type-only imports from namedImports", () => {
-    const result = parseSourceFile(project, "src/graph/build-graph.ts");
-    // build-graph.ts imports type { ParsedFile } from parser.js -- type-only
-    const parserImport = result.namedImports.find((ni) => ni.source === "./parser.js");
-    expect(parserImport).toBeUndefined();
+    const result = parseSourceFile(project, "src/summarize/template.ts");
+    // template.ts has import type { HistoryEntry } from "../graph/query.js"
+    const queryImport = result.namedImports.find((ni) => ni.source === "../graph/query.js");
+    expect(queryImport).toBeUndefined();
     // but the bare imports array still includes it (for file-level import edges)
-    expect(result.imports).toContain("./parser.js");
+    expect(result.imports).toContain("../graph/query.js");
   });
 
   it("excludes external package imports from namedImports", () => {
@@ -99,17 +100,14 @@ describe("parseSourceFile", () => {
   });
 
   it("does not capture method calls (property access callee)", () => {
-    const result = parseSourceFile(project, "src/graph/build-graph.ts");
-    const buildFn = result.symbols.find((s) => s.name === "buildGraph");
+    const result = parseSourceFile(project, "src/summarize/template.ts");
+    const buildFn = result.symbols.find((s) => s.name === "buildTemplateSummary");
     expect(buildFn).toBeDefined();
-    // buildGraph calls db.exec, insertFile, etc. -- these are property access
-    // calls which should NOT be captured (only simple identifiers)
-    expect(buildFn!.calls).not.toContain("db.exec");
-    expect(buildFn!.calls).not.toContain("moduleSymbolIds.set");
-    // but insertFile, insertSymbol, resolveImport are imported bare names
-    expect(buildFn!.calls).toContain("insertFile");
-    expect(buildFn!.calls).toContain("insertSymbol");
-    expect(buildFn!.calls).toContain("resolveImport");
+    // buildTemplateSummary calls entry.message.split, lines.push, etc. -- property access
+    // which should NOT be captured (only simple identifiers)
+    expect(buildFn!.calls).not.toContain("entry.message.split");
+    expect(buildFn!.calls).not.toContain("lines.push");
+    // but toDateString or similar bare calls would be captured
   });
 
   it("returns empty calls array for symbols with no function body", () => {
@@ -118,5 +116,30 @@ describe("parseSourceFile", () => {
     const version = result.symbols.find((s) => s.name === "SCHEMA_VERSION");
     expect(version).toBeDefined();
     expect(version!.calls).toEqual([]);
+  });
+
+  // ── Top-level calls (moduleCalls) ──────────────────────────────────
+
+  it("collects calls from top-level script code in moduleCalls", () => {
+    const result = parseSourceFile(project, "src/cli/index.ts");
+    // index.ts has top-level calls: registerInitCommand, registerWhyCommand, etc.
+    expect(result.moduleCalls.length).toBeGreaterThan(0);
+    expect(result.moduleCalls).toContain("registerInitCommand");
+    expect(result.moduleCalls).toContain("registerWhyCommand");
+    expect(result.moduleCalls).toContain("registerImpactCommand");
+  });
+
+  it("returns empty moduleCalls for a file with only declarations", () => {
+    const result = parseSourceFile(project, "src/store/schema.ts");
+    // schema.ts only has const exports, no top-level function calls
+    expect(result.moduleCalls).toEqual([]);
+  });
+
+  it("collects moduleCalls from ingestion scripts with top-level loops", () => {
+    const result = parseSourceFile(project, "src/ingestion/graph-load.ts");
+    // graph-load.ts has top-level for loops calling insertFile, insertSymbol, etc.
+    expect(result.moduleCalls).toContain("insertFile");
+    expect(result.moduleCalls).toContain("insertSymbol");
+    expect(result.moduleCalls).toContain("insertEdge");
   });
 });

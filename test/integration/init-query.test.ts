@@ -101,6 +101,39 @@ describe("init pipeline (integration)", () => {
     const count = db.prepare("SELECT COUNT(*) as c FROM commit_files").get() as { c: number };
     expect(count.c).toBeGreaterThan(100);
   });
+
+  it("has at most one module symbol per file", () => {
+    const db = openDatabase(DB_PATH);
+    const dupes = db
+      .prepare(
+        "SELECT file_id, COUNT(*) as c FROM symbols WHERE kind = 'module' GROUP BY file_id HAVING c > 1"
+      )
+      .all() as Array<{ file_id: number; c: number }>;
+    expect(dupes).toEqual([]);
+  });
+
+  it("collects top-level calls in module symbols", () => {
+    const db = openDatabase(DB_PATH);
+    // src/cli/index.ts should have a module symbol with calls
+    // (registerInitCommand, registerWhyCommand, registerImpactCommand)
+    const file = db
+      .prepare("SELECT id FROM files WHERE path = 'src/cli/index.ts'")
+      .get() as { id: number } | undefined;
+    expect(file).toBeDefined();
+
+    const modSym = db
+      .prepare("SELECT kind FROM symbols WHERE file_id = ? AND kind = 'module'")
+      .get(file!.id) as { kind: string } | undefined;
+    expect(modSym).toBeDefined();
+
+    // Module symbol should have call edges
+    const callEdges = db
+      .prepare(
+        "SELECT COUNT(*) as c FROM edges WHERE from_symbol_id = (SELECT id FROM symbols WHERE file_id = ? AND kind = 'module') AND edge_type = 'calls'"
+      )
+      .get(file!.id) as { c: number };
+    expect(callEdges.c).toBeGreaterThan(0);
+  });
 });
 
 describe("why queries (integration)", () => {
