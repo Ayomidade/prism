@@ -66,38 +66,42 @@ if (existingCount > 0) {
   }
 }
 
-// Insert commits
-for (const c of data.commits) {
-  insertCommit(db, c.sha, c.author, c.date, c.message);
-}
-
-// Insert files + commit_files (as line ranges)
-for (const file of data.files) {
-  const fileId = insertFile(db, file.path);
-
-  // Group lines by commit SHA
-  const byCommit = new Map<string, number[]>();
-  for (const entry of file.blame) {
-    if (entry.commitSha.startsWith("00000000")) continue;
-    let lines = byCommit.get(entry.commitSha);
-    if (!lines) {
-      lines = [];
-      byCommit.set(entry.commitSha, lines);
-    }
-    lines.push(entry.line);
+// Insert commits + files + commit_files in a single transaction for performance
+const insertAll = db.transaction(() => {
+  for (const c of data.commits) {
+    insertCommit(db, c.sha, c.author, c.date, c.message);
   }
 
-  // Insert one row per commit (as a line range) instead of one row per line
-  const insert = db.prepare(
+  // Insert files + commit_files (as line ranges)
+  const cfInsert = db.prepare(
     "INSERT OR IGNORE INTO commit_files (commit_sha, file_id, start_line, end_line) VALUES (?, ?, ?, ?)"
   );
-  for (const [commitSha, lines] of byCommit) {
-    const ranges = mergeToRanges(lines);
-    for (const range of ranges) {
-      insert.run(commitSha, fileId, range.start, range.end);
+
+  for (const file of data.files) {
+    const fileId = insertFile(db, file.path);
+
+    // Group lines by commit SHA
+    const byCommit = new Map<string, number[]>();
+    for (const entry of file.blame) {
+      if (entry.commitSha.startsWith("00000000")) continue;
+      let lines = byCommit.get(entry.commitSha);
+      if (!lines) {
+        lines = [];
+        byCommit.set(entry.commitSha, lines);
+      }
+      lines.push(entry.line);
+    }
+
+    // Insert one row per commit (as a line range) instead of one row per line
+    for (const [commitSha, lines] of byCommit) {
+      const ranges = mergeToRanges(lines);
+      for (const range of ranges) {
+        cfInsert.run(commitSha, fileId, range.start, range.end);
+      }
     }
   }
-}
+});
+insertAll();
 
 const counts = {
   commits: (db.prepare("SELECT COUNT(*) as c FROM commits").get() as any).c,

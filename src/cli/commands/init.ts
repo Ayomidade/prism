@@ -17,6 +17,19 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
   // 1. Create .prism directory
   mkdirSync(join(repoRoot, ".prism"), { recursive: true });
 
+  // 1a. Check for shallow clone
+  try {
+    const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+      encoding: "utf-8",
+      cwd: repoRoot,
+    }).trim();
+    if (shallow === "true") {
+      console.log("  Warning: This is a shallow clone. History is incomplete.");
+    }
+  } catch {
+    // If the check fails, proceed — don't block indexing
+  }
+
   // 2. Git log (no DB needed)
   console.log("  Parsing git history...");
   const commits = await parseGitLog(repoRoot);
