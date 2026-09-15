@@ -10,10 +10,6 @@ Claimed as working, but not yet verified end-to-end the way `impact`'s bug fix w
 
 - **GitHub PR/issue enrichment (`github-fetch.ts`)** — built and unit-tested in isolation, but not yet verified end-to-end against a real token and a real repo with linked PRs/issues. Code path: token set → `github.ts` fetches PRs → `github-fetch.ts` queries them → `pr_issue_links` table populated → `why` output includes PR numbers/titles. Needs a real `PRISM_GITHUB_TOKEN` + a repo where commits have linked PRs.
 
-## UX gaps
-
-- **No way to set or view AI model from the CLI.** Default models may not be accessible (e.g. Groq's default `llama-3.3-70b-versatile` returned 404 on a real run). Users can override via `PRISM_AI_MODEL` env var, but there's no `prism config` subcommand to set or view it. Need: `prism config set-model <provider> <model>` to persist a model choice, and `prism config show` to display all configured keys and models. Also: the `why` error message should surface the actual provider and model name so the user knows what failed (currently says "AI analysis unavailable: groq API error..." which is opaque — should say which provider was tried and what model).
-
 ---
 
 ## Process

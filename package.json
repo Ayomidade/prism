@@ -6,14 +6,12 @@
   "bin": {
     "prism": "./dist/index.js"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "dev": "tsx src/cli/index.ts",
-    "build": "tsup src/cli/index.ts --format esm --dts --clean",
+    "build": "tsup src/cli/index.ts --format esm --clean",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
@@ -35,8 +33,5 @@
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
-  },
-  "allowScripts": {
-    "better-sqlite3@11.10.0": true
   }
 }

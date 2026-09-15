@@ -123,7 +123,7 @@ for (const file of parsed) {
 
 const symCount = (db.prepare("SELECT COUNT(*) as c FROM symbols").get() as any).c;
 const edgeCount = (db.prepare("SELECT COUNT(*) as c FROM edges").get() as any).c;
-console.log(`Graph loaded: ${parsed.length} files, ${symCount} symbols, ${edgeCount} edges`);
+process.stderr.write(`Graph loaded: ${parsed.length} files, ${symCount} symbols, ${edgeCount} edges\n`);
 db.close();
 // Force immediate exit to prevent better-sqlite3 destructor crash
 // during Node.js process teardown (RemoveEnvironmentCleanupHook assertion).
