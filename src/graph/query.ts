@@ -15,6 +15,7 @@ export interface HistoryEntry {
 export interface Dependent {
   file: string;
   symbol: string;
+  kind: string;
   depth: number;
 }
 
@@ -253,24 +254,21 @@ export function queryDependents(
   visited.add(symbolId);
 
   const findParents = db.prepare(
-    `SELECT DISTINCT s.id, s.name as symbol, f.path as file
+    `SELECT DISTINCT s.id, s.name as symbol, s.kind as kind, f.path as file
      FROM edges e
      JOIN symbols s ON e.from_symbol_id = s.id
      JOIN files f ON s.file_id = f.id
-     WHERE e.to_symbol_id = ? AND e.edge_type = 'calls'`
+     WHERE e.to_symbol_id = ? AND e.edge_type IN ('calls', 'imports')`
   );
 
   while (queue.length > 0) {
     const current = queue.shift()!;
-    if (current.depth > 0) {
-      // We already looked up the parent info when enqueuing
-    }
-
     if (current.depth >= maxDepth) continue;
 
     const parents = findParents.all(current.id) as {
       id: number;
       symbol: string;
+      kind: string;
       file: string;
     }[];
 
@@ -281,6 +279,7 @@ export function queryDependents(
       results.push({
         file: parent.file,
         symbol: parent.symbol,
+        kind: parent.kind,
         depth: current.depth + 1,
       });
 

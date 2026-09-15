@@ -51,7 +51,8 @@ function formatTree(target: string, dependents: Dependent[]): string {
     lines.push(file);
     for (const dep of deps) {
       const indent = "  ".repeat(dep.depth);
-      lines.push(`${indent}${dep.symbol}`);
+      const label = dep.kind === "module" ? `${dep.symbol} (top-level code)` : dep.symbol;
+      lines.push(`${indent}${label}`);
     }
   }
 

@@ -47,9 +47,9 @@ describe("escapeHtml", () => {
 // ── generateImpactHtml ──────────────────────────────────────────────────────
 
 const SAMPLE_DEPS: Dependent[] = [
-  { file: "src/cli/commands/impact.ts", symbol: "registerImpactCommand", depth: 1 },
-  { file: "src/cli/commands/impact.ts", symbol: "formatTree", depth: 2 },
-  { file: "src/graph/query.ts", symbol: "resolveSymbol", depth: 1 },
+  { file: "src/cli/commands/impact.ts", symbol: "registerImpactCommand", kind: "function", depth: 1 },
+  { file: "src/cli/commands/impact.ts", symbol: "formatTree", kind: "function", depth: 2 },
+  { file: "src/graph/query.ts", symbol: "resolveSymbol", kind: "function", depth: 1 },
 ];
 
 describe("generateImpactHtml", () => {
@@ -135,7 +135,7 @@ describe("generateImpactHtml", () => {
 
   it("escapes XSS in file paths", () => {
     const xssDep: Dependent[] = [
-      { file: "<script>alert('xss')</script>", symbol: "fn", depth: 1 },
+      { file: "<script>alert('xss')</script>", symbol: "fn", kind: "function", depth: 1 },
     ];
     const html = generateImpactHtml("target", xssDep);
     expect(html).not.toContain("<script>");
@@ -144,7 +144,7 @@ describe("generateImpactHtml", () => {
 
   it("escapes XSS in symbol names", () => {
     const xssDep: Dependent[] = [
-      { file: "src/a.ts", symbol: "<img src=x onerror=alert(1)>", depth: 1 },
+      { file: "src/a.ts", symbol: "<img src=x onerror=alert(1)>", kind: "function", depth: 1 },
     ];
     const html = generateImpactHtml("target", xssDep);
     expect(html).not.toContain("<img");

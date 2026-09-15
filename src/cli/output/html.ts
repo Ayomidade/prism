@@ -70,7 +70,7 @@ export function generateImpactHtml(
       treeHtml += `<span class="file-icon">📄</span> <span class="file-path">${safeFile}</span>`;
       treeHtml += `<ul class="tree-symbols">`;
       for (const dep of deps) {
-        const safeSymbol = escapeHtml(dep.symbol);
+        const safeSymbol = escapeHtml(dep.kind === "module" ? `${dep.symbol} (top-level code)` : dep.symbol);
         const depthClass = `depth-${Math.min(dep.depth, 4)}`;
         treeHtml += `<li class="${depthClass}">`;
         treeHtml += `<span class="symbol-kind">${getKindIcon(dep)}</span> `;
@@ -314,8 +314,26 @@ export function generateImpactHtml(
  * Since we don't have the kind in the Dependent interface,
  * we use a generic function icon.
  */
-function getKindIcon(_dep: Dependent): string {
-  // The Dependent type doesn't include kind, so we use a generic icon.
-  // If kind is added later, this can be made more specific.
-  return "ƒ";
+function getKindIcon(dep: Dependent): string {
+  switch (dep.kind) {
+    case "module":
+      return "📄";
+    case "function":
+      return "ƒ";
+    case "class":
+      return "C";
+    case "method":
+      return "m";
+    case "variable":
+    case "const":
+      return "V";
+    case "interface":
+      return "I";
+    case "type":
+      return "T";
+    case "enum":
+      return "E";
+    default:
+      return "ƒ";
+  }
 }
