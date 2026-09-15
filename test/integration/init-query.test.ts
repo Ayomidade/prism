@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { rmSync, existsSync, mkdirSync } from "node:fs";
+import { rmSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { openDatabase } from "../../src/store/db.js";
 import {
@@ -234,5 +234,73 @@ describe("impact queries (integration)", () => {
     expect(matches.length).toBeGreaterThan(0);
     const repoMatch = matches.find((m) => m.file === "src/store/repository.ts");
     expect(repoMatch).toBeDefined();
+  });
+});
+
+// ── CLI output format tests ─────────────────────────────────────────
+
+function runCli(...args: string[]): string {
+  return execFileSync("npx", ["tsx", "src/cli/index.ts", ...args], {
+    cwd: REPO_ROOT,
+    encoding: "utf-8",
+    timeout: 60_000,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+
+describe("prism impact --html (integration)", () => {
+  const htmlPath = "test-tmp-integration/integration-test-report.html";
+
+  beforeAll(() => {
+    mkdirSync("test-tmp-integration", { recursive: true });
+  });
+
+  afterAll(() => {
+    if (existsSync(htmlPath)) rmSync(htmlPath);
+  });
+
+  it("generates a valid HTML file", () => {
+    runCli("impact", "openDatabase", "--html", htmlPath);
+    expect(existsSync(htmlPath)).toBe(true);
+
+    const html = readFileSync(htmlPath, "utf-8");
+    expect(html).toContain("<!DOCTYPE html>");
+    expect(html).toContain("</html>");
+    expect(html).toContain("openDatabase");
+  });
+
+  it("HTML contains the impact tree with dependents", () => {
+    const html = readFileSync(htmlPath, "utf-8");
+    expect(html).toContain("registerImpactCommand");
+    expect(html).toContain("registerWhyCommand");
+  });
+});
+
+describe("prism why --json (integration)", () => {
+  it("returns valid JSON with the expected shape", () => {
+    const output = runCli("why", "src/store/db.ts:54", "--json");
+    const parsed = JSON.parse(output);
+
+    expect(parsed).toHaveProperty("target");
+    expect(parsed).toHaveProperty("confidence");
+    expect(parsed).toHaveProperty("commitCount");
+    expect(parsed).toHaveProperty("history");
+    expect(typeof parsed.target).toBe("string");
+    expect(["documented", "ai-inferred", "none"]).toContain(parsed.confidence);
+    expect(typeof parsed.commitCount).toBe("number");
+    expect(Array.isArray(parsed.history)).toBe(true);
+  });
+
+  it("history entries have the expected fields", () => {
+    const output = runCli("why", "--function", "openDatabase", "--json");
+    const parsed = JSON.parse(output);
+
+    expect(parsed.history.length).toBeGreaterThan(0);
+    const entry = parsed.history[0];
+    expect(entry).toHaveProperty("commitSha");
+    expect(entry).toHaveProperty("message");
+    expect(entry).toHaveProperty("date");
+    expect(entry).toHaveProperty("author");
+    expect(entry.commitSha).toMatch(/^[0-9a-f]{40}$/);
   });
 });

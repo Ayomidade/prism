@@ -1,9 +1,11 @@
 node_modules/
 dist/
-.prism/
+.prim/
 *.log
 .env
 .DS_Store
 coverage/
+# Test artifacts: integration test repos and HTML output. Broad glob
+# catches any temp test directories (e.g. test-tmp-integration/).
 test-tmp*/
 impact-report.html
