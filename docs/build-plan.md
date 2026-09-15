@@ -1,5 +1,8 @@
-# Build Plan
+# Build Plan (Historical)
 ## PRISM — Codebase Intelligence Tool
+
+> **Status:** This build plan is preserved for reference. All three phases are complete.
+> See `linking.md` for the actual build log of what shipped.
 
 This is a real portfolio project, not a hackathon, so the plan is scoped as **three phases** rather than three days. Each phase is broken into small daily tasks so progress stays trackable even working solo alongside other commitments.
 

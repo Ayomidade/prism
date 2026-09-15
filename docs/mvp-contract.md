@@ -37,22 +37,20 @@ Three commands. That's it. If a feature doesn't serve one of these three flows, 
 ## In scope for v1
 
 - `prism init` — local git ingestion + AST-based code graph, stored in SQLite
-- `prism why` — commit history + optional GitHub PR/issue context, template-based summary by default, confidence-tagged
+- `prism why` — commit history + optional GitHub PR/issue context, confidence-tagged
+- `prism why` — multi-provider AI summarization (Anthropic, OpenAI, Gemini, Groq, custom endpoint) with template fallback when no key configured
 - `prism impact` — dependency graph traversal, terminal tree output
+- `prism impact --html` — standalone responsive HTML report export
 - `--json` output mode on both `why` and `impact`
-- Graceful handling of: no git history, missing GitHub token, missing AI key
+- Graceful handling of: no git history, shallow clones, missing GitHub token, missing AI key
 - npm package, installable/runnable via `npx prism`
 
 ## Explicitly out of scope for v1
 
 - VS Code extension
-- AI-assisted summarization (optional stretch, not required for v1 to ship — template-based fallback is the real v1 default)
-- HTML report export (moved to a fast-follow, not required for the MVP contract to be satisfied)
 - Runtime error tracing
 - Environment/setup diagnostics ("why doesn't this run")
 - Any hosted/SaaS component, any user accounts, any server
-
-**Note:** this tightens the PRD's "should have" list. AI summarization and the HTML export were "should have" in the PRD, but for the frozen v1 contract they're reclassified as fast-follow, not required to ship. The three commands above, with template-based `why` and terminal-only `impact`, are what "v1 done" means. Everything else ships after v1 is real and working on a real repo.
 
 ---
 
