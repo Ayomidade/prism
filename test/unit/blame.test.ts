@@ -1,24 +1,69 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { parseGitBlame } from "../../src/ingestion/git/blame.js";
+import { parseGitLog } from "../../src/ingestion/git/log.js";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-const REPO_ROOT = ".";
+let fixtureDir: string;
+
+beforeAll(() => {
+  fixtureDir = mkdtempSync(join(tmpdir(), "prism-blame-test-"));
+  execSync("git init", { cwd: fixtureDir });
+  execSync("git config user.email 'test@test.com'", { cwd: fixtureDir });
+  execSync("git config user.name 'Test'", { cwd: fixtureDir });
+
+  // Create a multi-line file committed in a single commit
+  mkdirSync(join(fixtureDir, "src"), { recursive: true });
+  writeFileSync(
+    join(fixtureDir, "src/app.ts"),
+    [
+      "export function greet(name: string): string {",
+      "  return `Hello, ${name}!`;",
+      "}",
+      "",
+      "export function add(a: number, b: number): number {",
+      "  return a + b;",
+      "}",
+    ].join("\n")
+  );
+  execSync("git add -A && git commit -m 'feat: add utils'", {
+    cwd: fixtureDir,
+  });
+
+  // Second commit modifying one function
+  writeFileSync(
+    join(fixtureDir, "src/app.ts"),
+    [
+      "export function greet(name: string): string {",
+      "  return `Hi, ${name}!`;",
+      "}",
+      "",
+      "export function add(a: number, b: number): number {",
+      "  return a + b;",
+      "}",
+    ].join("\n")
+  );
+  execSync("git add -A && git commit -m 'fix: update greeting'", {
+    cwd: fixtureDir,
+  });
+});
+
+afterAll(() => {
+  rmSync(fixtureDir, { recursive: true, force: true });
+});
 
 describe("parseGitBlame", () => {
-  // Use src/ingestion/github/client.ts (10 lines, single commit) for
-  // stable assertions that won't break when other files are modified.
-  const STABLE_FILE = "src/ingestion/github/client.ts";
-  const STABLE_LINES = 10;
-
   it("attributes every line in a real file to a commit", async () => {
-    const result = await parseGitBlame(REPO_ROOT, STABLE_FILE);
-    expect(result.length).toBe(STABLE_LINES);
+    const result = await parseGitBlame(fixtureDir, "src/app.ts");
+    expect(result.length).toBe(7);
   });
 
   it("returns sequential line numbers starting from 1", async () => {
-    const result = await parseGitBlame(REPO_ROOT, STABLE_FILE);
+    const result = await parseGitBlame(fixtureDir, "src/app.ts");
     expect(result[0].line).toBe(1);
-    expect(result[result.length - 1].line).toBe(STABLE_LINES);
-    // No gaps, no duplicates
+    expect(result[result.length - 1].line).toBe(7);
     const lines = result.map((r) => r.line).sort((a, b) => a - b);
     for (let i = 0; i < lines.length; i++) {
       expect(lines[i]).toBe(i + 1);
@@ -26,47 +71,52 @@ describe("parseGitBlame", () => {
   });
 
   it("returns valid 40-char hex SHAs", async () => {
-    const result = await parseGitBlame(REPO_ROOT, STABLE_FILE);
+    const result = await parseGitBlame(fixtureDir, "src/app.ts");
     for (const r of result) {
       expect(r.commitSha).toMatch(/^[0-9a-f]{40}$/);
     }
   });
 
-  it("maps all lines to the correct commit for single-commit files", async () => {
-    // client.ts was created in the scaffold commit and never modified.
-    const result = await parseGitBlame(REPO_ROOT, STABLE_FILE);
-    const shas = new Set(result.map((r) => r.commitSha));
-    expect(shas.size).toBe(1);
-    expect(result.length).toBe(STABLE_LINES);
+  it("attributes modified lines to the newer commit", async () => {
+    const result = await parseGitBlame(fixtureDir, "src/app.ts");
+    // Line 2 (greet body) was changed in commit 2; all others from commit 1
+    const line2 = result.find((r) => r.line === 2)!;
+    const line3 = result.find((r) => r.line === 3)!;
+    expect(line2.commitSha).not.toBe(line3.commitSha);
   });
 
   it("returns [] for a nonexistent file", async () => {
-    const result = await parseGitBlame(REPO_ROOT, "src/does-not-exist.ts");
+    const result = await parseGitBlame(fixtureDir, "src/does-not-exist.ts");
     expect(result).toEqual([]);
   });
 
-  it("returns [] for a binary file", async () => {
-    // package-lock.json is text but very large — test the error path
-    // by using a path that git can't blame
-    const result = await parseGitBlame(REPO_ROOT, "");
+  it("returns [] for an empty path", async () => {
+    const result = await parseGitBlame(fixtureDir, "");
     expect(result).toEqual([]);
   });
+});
 
-  it("returns an empty array for an empty file", async () => {
-    // test/fixtures/sample-repo/README.md exists but is small
-    const result = await parseGitBlame(REPO_ROOT, "test/fixtures/sample-repo/README.md");
-    expect(result.length).toBeGreaterThan(0);
-    // All lines should be attributed
-    const lines = result.map((r) => r.line).sort((a, b) => a - b);
-    expect(lines[0]).toBe(1);
-    expect(lines[lines.length - 1]).toBe(result.length);
+describe("parseGitLog", () => {
+  it("parses the fixture commits", async () => {
+    const commits = await parseGitLog(fixtureDir);
+    expect(commits.length).toBe(2);
   });
 
-  it("handles the file exactly matching its line count", async () => {
-    const result = await parseGitBlame(REPO_ROOT, "src/cli/index.ts");
-    // index.ts is 20 lines, all from the scaffold commit
-    expect(result.length).toBe(20);
-    const shas = new Set(result.map((r) => r.commitSha));
-    expect(shas.size).toBe(1);
+  it("does not leak the record separator into commit messages", async () => {
+    const commits = await parseGitLog(fixtureDir);
+    for (const c of commits) {
+      expect(c.message).not.toContain("\x1e");
+    }
+  });
+
+  it("returns real SHAs (40 hex chars)", async () => {
+    const commits = await parseGitLog(fixtureDir);
+    expect(commits[0].sha).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it("parses commits in reverse chronological order", async () => {
+    const commits = await parseGitLog(fixtureDir);
+    expect(commits[0].message).toContain("fix: update greeting");
+    expect(commits[1].message).toContain("feat: add utils");
   });
 });
