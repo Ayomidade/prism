@@ -35,7 +35,7 @@ const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     id: "gemini",
     wireFormat: "openai-compatible",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    defaultModel: "gemini-2.0-flash",
+    defaultModel: "gemini-3.6-flash",
   },
   groq: {
     id: "groq",

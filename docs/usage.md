@@ -139,13 +139,15 @@ PRISM supports multiple AI providers for richer `why` summaries. If no AI key is
 
 ### Supported Providers
 
-| Provider | Key Environment Variable | Default Model |
-|----------|--------------------------|---------------|
-| Anthropic | `PRISM_ANTHROPIC_KEY` | `claude-sonnet-4-20250514` |
-| OpenAI | `PRISM_OPENAI_KEY` | `gpt-4o-mini` |
-| Google Gemini | `PRISM_GEMINI_KEY` | `gemini-2.0-flash` |
-| Groq | `PRISM_GROQ_KEY` | `llama-3.3-70b-versatile` |
-| Custom (OpenRouter, Ollama, etc.) | `PRISM_CUSTOM_KEY` | (must set `PRISM_AI_MODEL`) |
+| Provider | Key Env Var | Default Model | Recommended Models |
+|----------|-------------|---------------|-------------------|
+| Anthropic | `PRISM_ANTHROPIC_KEY` | `claude-sonnet-4-20250514` | `claude-sonnet-4-20250514`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229` |
+| OpenAI | `PRISM_OPENAI_KEY` | `gpt-4o-mini` | `gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo` |
+| Google Gemini | `PRISM_GEMINI_KEY` | `gemini-3.6-flash` | `gemini-3.6-flash`, `gemini-2.5-pro`, `gemini-2.0-flash` |
+| Groq | `PRISM_GROQ_KEY` | `llama-3.3-70b-versatile` | `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768` |
+| Custom | `PRISM_CUSTOM_KEY` | (must set model) | Any model your endpoint supports |
+
+Use `prism config set-model <provider> <model>` to override the default for any provider.
 
 ### Setting an API Key
 

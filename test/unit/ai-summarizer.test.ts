@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { HistoryEntry } from "../../src/graph/query.js";
 
+// Mock tokens.ts so auto-detect only reads from env vars, not real files.
+vi.mock("../../src/config/tokens.js", () => ({
+  getProviderKey: (id: string) => process.env[`PRISM_${id.toUpperCase()}_KEY`],
+  getModel: (_id: string) => process.env.PRISM_AI_MODEL,
+  getGitHubToken: () => process.env.PRISM_GITHUB_TOKEN,
+}));
+
 // Mock the @anthropic-ai/sdk module at module scope (vitest hoists vi.mock)
 const mockCreate = vi.fn().mockResolvedValue({
   content: [{ type: "text", text: "This code implements a database connection layer." }],
