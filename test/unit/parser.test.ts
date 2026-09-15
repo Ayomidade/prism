@@ -36,6 +36,7 @@ describe("parseSourceFile", () => {
       "./commands/init.js",
       "./commands/why.js",
       "./commands/impact.js",
+      "./commands/config.js",
     ]);
   });
 

@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { registerInitCommand } from "./commands/init.js";
 import { registerWhyCommand } from "./commands/why.js";
 import { registerImpactCommand } from "./commands/impact.js";
+import { registerConfigCommand } from "./commands/config.js";
 
 // See docs/prism-v1-build-spec.md Section 5 for the exact command contract.
 
@@ -16,5 +17,6 @@ program
 registerInitCommand(program);
 registerWhyCommand(program);
 registerImpactCommand(program);
+registerConfigCommand(program);
 
 program.parseAsync(process.argv);

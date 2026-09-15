@@ -88,7 +88,7 @@ export function resolveAiProviderConfig(): ResolvedProviderConfig | null {
     if (!key) {
       throw new Error(
         `PRISM_AI_PROVIDER is set to "${explicitId}" but no key is configured for it. ` +
-          `Set PRISM_${explicitId.toUpperCase()}_KEY or run prism config set-key ${explicitId} <key>.`
+          `Set PRISM_${explicitId.toUpperCase()}_KEY or store it with: prism config set-key ${explicitId} <key>`
       );
     }
     return buildConfig(explicitId, key);
@@ -96,7 +96,14 @@ export function resolveAiProviderConfig(): ResolvedProviderConfig | null {
 
   for (const id of AUTO_DETECT_ORDER) {
     const key = getProviderKey(id);
-    if (key) return buildConfig(id, key);
+    if (!key) continue;
+    try {
+      return buildConfig(id, key);
+    } catch {
+      // Misconfigured provider (e.g. custom with no base URL) shouldn't
+      // block auto-detect from trying the next candidate.
+      continue;
+    }
   }
 
   return null;

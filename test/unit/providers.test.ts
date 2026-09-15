@@ -218,4 +218,30 @@ describe("resolveAiProviderConfig", () => {
     const config = resolveAiProviderConfig();
     expect(config!.apiKey).toBe("gsk_abc123");
   });
+
+  // ── Auto-detect edge cases ──────────────────────────────────────
+
+  it("skips misconfigured custom provider during auto-detect", () => {
+    // Stale custom key file but no base URL/model — should not crash,
+    // should fall through to null (template fallback).
+    delete process.env.PRISM_AI_PROVIDER;
+    delete process.env.PRISM_ANTHROPIC_KEY;
+    delete process.env.PRISM_OPENAI_KEY;
+    delete process.env.PRISM_GEMINI_KEY;
+    delete process.env.PRISM_GROQ_KEY;
+    process.env.PRISM_CUSTOM_KEY = "stale-key";
+
+    const config = resolveAiProviderConfig();
+    expect(config).toBeNull();
+  });
+
+  it("picks openai over misconfigured custom during auto-detect", () => {
+    delete process.env.PRISM_AI_PROVIDER;
+    delete process.env.PRISM_ANTHROPIC_KEY;
+    process.env.PRISM_OPENAI_KEY = "sk-test";
+    process.env.PRISM_CUSTOM_KEY = "stale-key";
+
+    const config = resolveAiProviderConfig();
+    expect(config!.provider.id).toBe("openai");
+  });
 });
