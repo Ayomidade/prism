@@ -4,10 +4,10 @@
   "description": "Understand your codebase before you change it. Local-first CLI that indexes git history and code structure to explain why code exists and what a change will break.",
   "type": "module",
   "bin": {
-    "prism": "./dist/cli/index.js"
+    "prism": "./dist/index.js"
   },
-  "main": "./dist/cli/index.js",
-  "types": "./dist/cli/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "engines": {
     "node": ">=18"
   },
