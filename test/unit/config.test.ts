@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync, rmSync } from "node:fs";
+import { readFileSync, existsSync, rmSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { tmpdir } from "node:os";
 
 const CLI = "src/cli/index.ts";
-const CONFIG_DIR = join(homedir(), ".config", "prism");
 
-function run(...args: string[]): { stdout: string; exitCode: number } {
+function run(homeDir: string, ...args: string[]): { stdout: string; exitCode: number } {
   try {
     const stdout = execFileSync("npx", ["tsx", CLI, ...args], {
       encoding: "utf-8",
       cwd: process.cwd(),
+      env: { ...process.env, HOME: homeDir },
     });
     return { stdout, exitCode: 0 };
   } catch (err: any) {
@@ -20,38 +20,43 @@ function run(...args: string[]): { stdout: string; exitCode: number } {
 }
 
 describe("prism config set-key", () => {
-  const originalEnv = { ...process.env };
+  let fakeHome: string;
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    // Clean up any test keys we created
-    for (const target of ["anthropic", "openai", "gemini", "groq", "custom"]) {
-      const f = join(CONFIG_DIR, `${target}-key`);
-      if (existsSync(f)) rmSync(f);
+    if (fakeHome && existsSync(fakeHome)) {
+      rmSync(fakeHome, { recursive: true, force: true });
     }
   });
 
   it("stores an anthropic key", () => {
-    const { stdout, exitCode } = run("config", "set-key", "anthropic", "sk-ant-test123");
+    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
+    const configDir = join(fakeHome, ".config", "prism");
+
+    const { stdout, exitCode } = run(fakeHome, "config", "set-key", "anthropic", "sk-ant-test123");
     expect(exitCode).toBe(0);
     expect(stdout).toContain("anthropic key stored");
-    expect(readFileSync(join(CONFIG_DIR, "anthropic-key"), "utf-8").trim()).toBe("sk-ant-test123");
+    expect(readFileSync(join(configDir, "anthropic-key"), "utf-8").trim()).toBe("sk-ant-test123");
   });
 
   it("stores a github token", () => {
-    const { stdout, exitCode } = run("config", "set-key", "github", "ghp_testtoken");
+    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
+    const configDir = join(fakeHome, ".config", "prism");
+
+    const { stdout, exitCode } = run(fakeHome, "config", "set-key", "github", "ghp_testtoken");
     expect(exitCode).toBe(0);
     expect(stdout).toContain("GitHub token stored");
-    expect(readFileSync(join(CONFIG_DIR, "token"), "utf-8").trim()).toBe("ghp_testtoken");
+    expect(readFileSync(join(configDir, "token"), "utf-8").trim()).toBe("ghp_testtoken");
   });
 
   it("rejects invalid target", () => {
-    const { exitCode } = run("config", "set-key", "invalid", "key");
+    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
+    const { exitCode } = run(fakeHome, "config", "set-key", "invalid", "key");
     expect(exitCode).toBe(1);
   });
 
   it("rejects missing arguments", () => {
-    const { exitCode } = run("config", "set-key");
+    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
+    const { exitCode } = run(fakeHome, "config", "set-key");
     expect(exitCode).toBe(1);
   });
 });

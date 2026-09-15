@@ -11,6 +11,7 @@ export function registerConfigCommand(program: Command): void {
 
   config
     .command("set-key")
+    .option("-h, --help", "Show help for the set-key command")
     .description("Store an API key or token locally (written to ~/.config/prism/)")
     .argument("<target>", "Provider name (anthropic, openai, gemini, groq, custom) or 'github'")
     .argument("<key>", "API key or token value")

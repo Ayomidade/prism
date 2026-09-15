@@ -44,7 +44,20 @@ if (!client) {
 }
 
 // Fetch PR/issue links for the commit SHAs
-const links = await linkCommitsToPrsAndIssues(client, shas);
+let links;
+try {
+  links = await linkCommitsToPrsAndIssues(client, shas);
+} catch (err: any) {
+  const msg = err?.message ?? String(err);
+  if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+    process.stdout.write("GitHub token is invalid or expired — skipping PR/issue enrichment.\n");
+  } else if (msg.includes("403") || msg.toLowerCase().includes("forbidden")) {
+    process.stdout.write("GitHub token lacks required permissions — skipping PR/issue enrichment.\n");
+  } else {
+    process.stdout.write(`GitHub API error — skipping PR/issue enrichment.\n`);
+  }
+  process.exit(0);
+}
 
 // Write results to SQLite
 const db = openDatabase(dbPath);

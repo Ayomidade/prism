@@ -6,5 +6,8 @@ import { Octokit } from "@octokit/rest";
 
 export function createGitHubClient(token: string | undefined): Octokit | null {
   if (!token) return null;
-  return new Octokit({ auth: token });
+  return new Octokit({
+    auth: token,
+    log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+  });
 }
