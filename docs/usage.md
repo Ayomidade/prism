@@ -115,13 +115,20 @@ prism impact openDatabase --html report.html  # HTML report to custom path
 ```
 Impact of changing src/store/db.ts:openDatabase:
 
-src/cli/commands/why.ts
-  openDatabase
-
 src/cli/commands/impact.ts
-  openDatabase
+  registerImpactCommand
+src/cli/commands/why.ts
+  registerWhyCommand
+src/cli/index.ts
+    src/cli/index.ts (top-level code)
+src/ingestion/db-write.ts
+  src/ingestion/db-write.ts (top-level code)
+src/ingestion/github-fetch.ts
+  src/ingestion/github-fetch.ts (top-level code)
+src/ingestion/graph-load.ts
+  src/ingestion/graph-load.ts (top-level code)
 
-2 dependents found.
+6 dependents found.
 ```
 
 ---
@@ -149,17 +156,18 @@ export PRISM_ANTHROPIC_KEY="sk-ant-..."
 prism why src/db.ts:42
 ```
 
-Or store permanently (written to `~/.config/prism/<provider>-key` with mode `0600`):
+Or store permanently with the config command (written to `~/.config/prism/<provider>-key` with mode `0600`):
 
 ```bash
-# From a Node.js script or shell:
-node -e "
-  const fs = require('fs');
-  const path = require('path');
-  const dir = path.join(require('os').homedir(), '.config/prism');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'anthropic-key'), 'sk-ant-...', { mode: 0o600 });
-"
+prism config set-key anthropic sk-ant-...
+prism config set-key openai sk-...
+prism config set-key github ghp_...
+```
+
+To check what's stored, look in `~/.config/prism/`. To remove a key, delete the file:
+
+```bash
+rm ~/.config/prism/anthropic-key
 ```
 
 ### Selecting a Provider
@@ -216,16 +224,10 @@ export PRISM_GITHUB_TOKEN="ghp_..."
 prism init
 ```
 
-Or store permanently (written to `~/.config/prism/token`):
+Or store permanently with the config command:
 
 ```bash
-node -e "
-  const fs = require('fs');
-  const path = require('path');
-  const dir = path.join(require('os').homedir(), '.config/prism');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'token'), 'ghp_...', { mode: 0o600 });
-"
+prism config set-key github ghp_...
 ```
 
 **Required scope:** `repo` (read-only access to pull requests).
@@ -370,6 +372,9 @@ PRISM works with shallow clones but history will be incomplete. Run `git fetch -
 
 **AI summarization falls back to template**  
 No AI key is configured. Set one of the provider keys (see [Configuring AI Summarization](#configuring-ai-summarization)).
+
+**`impact` shows "No dependents" for a symbol that's clearly used**  
+PRISM's call graph only tracks function/method *calls* (`foo()`), not value references (`foo` used as a variable, passed as an argument, or used in a template literal). If a symbol is referenced as a value rather than called, `impact` won't see it. This is a v1 scope cut — full type-checker resolution is out of scope.
 
 **`db.close()` crash**  
 PRISM removed all `db.close()` calls to avoid a known better-sqlite3 crash during Node.js process teardown. If you see this error, update to the latest version.

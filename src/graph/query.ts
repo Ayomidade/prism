@@ -233,8 +233,9 @@ function enrichWithPrData(
 /**
  * BFS traversal of reverse edges to find all dependents of a symbol.
  *
- * Follows `calls` edges in reverse — who calls this symbol? Then who
- * calls those callers? De-duplicates to avoid cycles.
+ * Follows `calls` and `imports` edges in reverse — who calls or imports
+ * this symbol? Then who calls/imports those callers? De-duplicates to
+ * avoid cycles.
  *
  * @param db         - Open SQLite database
  * @param symbolId   - ID of the target symbol

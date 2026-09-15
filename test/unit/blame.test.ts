@@ -10,7 +10,7 @@ let fixtureDir: string;
 
 beforeAll(() => {
   fixtureDir = mkdtempSync(join(tmpdir(), "prism-blame-test-"));
-  execSync("git init", { cwd: fixtureDir });
+  execSync("git init -q", { cwd: fixtureDir, stdio: "pipe" });
   execSync("git config user.email 'test@test.com'", { cwd: fixtureDir });
   execSync("git config user.name 'Test'", { cwd: fixtureDir });
 
