@@ -49,7 +49,7 @@ describe("parseSourceFile", () => {
     const result = parseSourceFile(project, "src/cli/commands/why.ts");
     expect(result.imports).toContain("../../store/db.js");
     expect(result.imports).toContain("../../graph/query.js");
-    expect(result.imports).toContain("../../summarize/template.js");
+    expect(result.imports).toContain("../../summarize/ai.js");
   });
 
   it("assigns correct line ranges to symbols", () => {

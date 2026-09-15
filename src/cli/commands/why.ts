@@ -1,10 +1,7 @@
 import type { Command } from "commander";
 import { openDatabase, getDbPath } from "../../store/db.js";
 import { queryHistoryForLocation, queryHistoryForFunction } from "../../graph/query.js";
-import { createTemplateSummarizer } from "../../summarize/template.js";
 import { createAiSummarizer } from "../../summarize/ai.js";
-import { getAnthropicKey } from "../../config/tokens.js";
-import type { Summarizer } from "../../summarize/types.js";
 import { existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 
@@ -51,22 +48,17 @@ export function registerWhyCommand(program: Command): void {
 
       const db = openDatabase(dbPath);
 
-      // Use AI summarizer if Anthropic key is configured, fall back to template
-      const anthropicKey = getAnthropicKey();
-      const summarizer: Summarizer = anthropicKey
-        ? await createAiSummarizer(anthropicKey)
-        : createTemplateSummarizer();
+      // Provider auto-detection handles template fallback internally
+      const summarizer = await createAiSummarizer();
 
       try {
         let history;
         let target;
 
         if (options.function) {
-          // Function name lookup
           target = options.function;
           history = queryHistoryForFunction(db, options.function);
         } else if (location) {
-          // file:line lookup
           const parsed = parseLocation(location);
           if (!parsed) {
             console.error(

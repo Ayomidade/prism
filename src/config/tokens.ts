@@ -2,15 +2,14 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-// Local storage for optional tokens: GitHub API token and Anthropic AI key.
-// Falls back to a local config file in ~/.config/prism/. Never logs or embeds
-// a raw token in any output.
+// Local storage for optional tokens: GitHub API token + per-AI-provider
+// keys. Falls back to a local config file in ~/.config/prism/. Never logs
+// or embeds a raw token in any output.
 // See docs/technical-architecture.md Section 5 (Authentication) and
 // Section 10 (Security Considerations).
 
 const CONFIG_DIR = join(homedir(), ".config", "prism");
 const TOKEN_FILE = join(CONFIG_DIR, "token");
-const ANTHROPIC_KEY_FILE = join(CONFIG_DIR, "anthropic-key");
 
 /**
  * Reads the GitHub token. Checks (in order):
@@ -44,19 +43,22 @@ export function setGitHubToken(token: string): void {
 }
 
 /**
- * Reads the Anthropic API key. Checks (in order):
- *   1. PRISM_ANTHROPIC_KEY env var
- *   2. ~/.config/prism/anthropic-key file
+ * Reads an AI provider's key. Checks (in order):
+ *   1. PRISM_<PROVIDER>_KEY env var (e.g. PRISM_OPENAI_KEY, PRISM_GEMINI_KEY)
+ *   2. ~/.config/prism/<provider>-key file
  *
- * @returns The key string, or undefined if not configured
+ * Generalizes what was previously a single hardcoded getAnthropicKey() —
+ * same lookup pattern, parametrized by provider id.
  */
-export function getAnthropicKey(): string | undefined {
-  const envKey = process.env.PRISM_ANTHROPIC_KEY;
+export function getProviderKey(providerId: string): string | undefined {
+  const envVar = `PRISM_${providerId.toUpperCase()}_KEY`;
+  const envKey = process.env[envVar];
   if (envKey) return envKey;
 
-  if (existsSync(ANTHROPIC_KEY_FILE)) {
+  const keyFile = join(CONFIG_DIR, `${providerId}-key`);
+  if (existsSync(keyFile)) {
     try {
-      return readFileSync(ANTHROPIC_KEY_FILE, "utf-8").trim();
+      return readFileSync(keyFile, "utf-8").trim();
     } catch {
       return undefined;
     }
@@ -66,10 +68,10 @@ export function getAnthropicKey(): string | undefined {
 }
 
 /**
- * Stores the Anthropic API key to ~/.config/prism/anthropic-key.
+ * Stores an AI provider's key to ~/.config/prism/<provider>-key.
  * Creates the config directory if it doesn't exist.
  */
-export function setAnthropicKey(key: string): void {
+export function setProviderKey(providerId: string, key: string): void {
   mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(ANTHROPIC_KEY_FILE, key + "\n", { mode: 0o600 });
+  writeFileSync(join(CONFIG_DIR, `${providerId}-key`), key + "\n", { mode: 0o600 });
 }

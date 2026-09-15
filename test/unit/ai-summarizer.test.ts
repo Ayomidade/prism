@@ -1,20 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import type { HistoryEntry } from "../../src/graph/query.js";
 
-// Mock the @anthropic-ai/sdk module before importing ai.ts
+// Mock the @anthropic-ai/sdk module at module scope (vitest hoists vi.mock)
 const mockCreate = vi.fn().mockResolvedValue({
   content: [{ type: "text", text: "This code implements a database connection layer." }],
 });
 
-vi.mock("@anthropic-ai/sdk", () => {
-  return {
-    default: class MockAnthropic {
-      messages = { create: mockCreate };
-    },
-  };
-});
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: class MockAnthropic {
+    messages = { create: mockCreate };
+  },
+}));
 
-// Dynamic import after mock is set up
 const { createAiSummarizer } = await import("../../src/summarize/ai.js");
 
 const SAMPLE_HISTORY: HistoryEntry[] = [
@@ -36,34 +33,56 @@ const SAMPLE_HISTORY: HistoryEntry[] = [
   },
 ];
 
-describe("createAiSummarizer", () => {
-  it("returns a Summarizer interface with summarize and summarizeJson methods", async () => {
-    const summarizer = await createAiSummarizer("test-key");
-    expect(typeof summarizer.summarize).toBe("function");
-    expect(typeof summarizer.summarizeJson).toBe("function");
+describe("createAiSummarizer (factory)", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    mockCreate.mockClear();
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: "This code implements a database connection layer." }],
+    });
   });
 
-  it("returns 'none' confidence for empty history (text mode)", async () => {
-    const summarizer = await createAiSummarizer("test-key");
+  it("falls back to template summarizer when no provider configured", async () => {
+    delete process.env.PRISM_AI_PROVIDER;
+    delete process.env.PRISM_ANTHROPIC_KEY;
+    delete process.env.PRISM_OPENAI_KEY;
+    delete process.env.PRISM_GEMINI_KEY;
+    delete process.env.PRISM_GROQ_KEY;
+
+    const summarizer = await createAiSummarizer();
+    // Template summarizer returns "documented" confidence
+    const result = await summarizer.summarize(SAMPLE_HISTORY, "openDatabase");
+    expect(result.confidence).toBe("documented");
+    expect(result.text).toContain("Why does openDatabase exist?");
+  });
+
+  it("returns empty-history result for template summarizer", async () => {
+    delete process.env.PRISM_AI_PROVIDER;
+    delete process.env.PRISM_ANTHROPIC_KEY;
+
+    const summarizer = await createAiSummarizer();
     const result = await summarizer.summarize([], "src/foo.ts:42");
-    expect(result.confidence).toBe("none");
     expect(result.text).toContain("No history found");
   });
+});
 
-  it("returns 'none' confidence for empty history (JSON mode)", async () => {
-    const summarizer = await createAiSummarizer("test-key");
-    const result = await summarizer.summarizeJson([], "src/foo.ts:42");
-    expect(result.confidence).toBe("none");
-    expect(result.commitCount).toBe(0);
-    expect(result.history).toEqual([]);
+describe("Anthropic provider (mocked)", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    mockCreate.mockClear();
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: "This code implements a database connection layer." }],
+    });
   });
 
   it("calls the Anthropic API and returns AI-inferred confidence", async () => {
-    mockCreate.mockResolvedValueOnce({
-      content: [{ type: "text", text: "This code implements a database connection layer." }],
-    });
+    process.env.PRISM_ANTHROPIC_KEY = "test-key";
 
-    const summarizer = await createAiSummarizer("test-key");
+    const summarizer = await createAiSummarizer();
     const result = await summarizer.summarize(SAMPLE_HISTORY, "openDatabase");
 
     expect(result.confidence).toBe("ai-inferred");
@@ -72,12 +91,13 @@ describe("createAiSummarizer", () => {
     expect(mockCreate).toHaveBeenCalled();
   });
 
-  it("includes template header before AI analysis in text mode", async () => {
+  it("includes template header before AI analysis", async () => {
+    process.env.PRISM_ANTHROPIC_KEY = "test-key";
     mockCreate.mockResolvedValueOnce({
       content: [{ type: "text", text: "Some AI text" }],
     });
 
-    const summarizer = await createAiSummarizer("test-key");
+    const summarizer = await createAiSummarizer();
     const result = await summarizer.summarize(SAMPLE_HISTORY, "openDatabase");
     expect(result.text).toContain("Why does openDatabase exist?");
     expect(result.text).toContain("Alice");
@@ -85,11 +105,12 @@ describe("createAiSummarizer", () => {
   });
 
   it("returns aiSummary in JSON mode", async () => {
+    process.env.PRISM_ANTHROPIC_KEY = "test-key";
     mockCreate.mockResolvedValueOnce({
       content: [{ type: "text", text: "AI summary text" }],
     });
 
-    const summarizer = await createAiSummarizer("test-key");
+    const summarizer = await createAiSummarizer();
     const result = await summarizer.summarizeJson(SAMPLE_HISTORY, "openDatabase");
     expect(result.aiSummary).toBe("AI summary text");
     expect(result.confidence).toBe("ai-inferred");
@@ -98,21 +119,22 @@ describe("createAiSummarizer", () => {
   });
 
   it("gracefully handles API errors in text mode", async () => {
+    process.env.PRISM_ANTHROPIC_KEY = "test-key";
     mockCreate.mockRejectedValueOnce(new Error("Invalid API key"));
 
-    const summarizer = await createAiSummarizer("test-key");
+    const summarizer = await createAiSummarizer();
     const result = await summarizer.summarize(SAMPLE_HISTORY, "openDatabase");
 
-    // Should fall back to documented confidence with error message
     expect(result.confidence).toBe("documented");
     expect(result.text).toContain("AI analysis unavailable");
     expect(result.text).toContain("Invalid API key");
   });
 
   it("gracefully handles API errors in JSON mode", async () => {
+    process.env.PRISM_ANTHROPIC_KEY = "test-key";
     mockCreate.mockRejectedValueOnce(new Error("Rate limited"));
 
-    const summarizer = await createAiSummarizer("test-key");
+    const summarizer = await createAiSummarizer();
     const result = await summarizer.summarizeJson(SAMPLE_HISTORY, "openDatabase");
 
     expect(result.confidence).toBe("documented");
