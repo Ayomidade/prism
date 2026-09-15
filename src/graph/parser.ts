@@ -136,7 +136,7 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
  * type-checker-backed resolution to do correctly, which is out of
  * scope for v1.
  */
-function collectCalls(node: { forEachDescendant: Function }): string[] {
+function collectCalls(node: { forEachDescendant: (cb: (child: any) => void) => void }): string[] {
   const calls: string[] = [];
   node.forEachDescendant((child: any) => {
     if (child.getKind() === SyntaxKind.CallExpression) {

@@ -59,7 +59,7 @@ export function generateImpactHtml(
   const sortedFiles = [...byFile.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
   // Build the tree HTML
-  let treeHtml = "";
+  let treeHtml: string;
   if (count === 0) {
     treeHtml = `<p class="empty">No dependents found. This symbol is a leaf — changing it won't break anything in the indexed graph.</p>`;
   } else {

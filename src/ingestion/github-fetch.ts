@@ -62,7 +62,6 @@ try {
 // Write results to SQLite
 const db = openDatabase(dbPath);
 
-let inserted = 0;
 for (const link of links) {
   insertPrIssueLink(
     db,
@@ -72,7 +71,6 @@ for (const link of links) {
     link.title,
     link.body,
   );
-  inserted++;
 }
 
 // Don't call db.close() — better-sqlite3 crashes during Node.js

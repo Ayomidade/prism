@@ -2,10 +2,16 @@
   "name": "prism-cli",
   "version": "0.1.0",
   "description": "Understand your codebase before you change it. Local-first CLI that indexes git history and code structure to explain why code exists and what a change will break.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "prism": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/usage.md"
+  ],
   "engines": {
     "node": ">=18"
   },
@@ -27,11 +33,14 @@
     "ts-morph": "^23.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.14.0",
+    "eslint": "^10.10.0",
     "tsup": "^8.2.0",
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.70.0",
     "vitest": "^2.0.0"
   }
 }

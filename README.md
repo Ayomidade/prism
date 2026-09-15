@@ -92,4 +92,4 @@ v1 ships four commands: `init`, `why`, `impact`, `config`. Includes multi-provid
 
 ## License
 
-TBD
+MIT — see [LICENSE](LICENSE) for details.
