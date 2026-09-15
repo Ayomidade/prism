@@ -1,4 +1,4 @@
-import { getProviderKey } from "../config/tokens.js";
+import { getProviderKey, getModel } from "../config/tokens.js";
 
 // Known providers speak one of two wire formats: Anthropic's native
 // Messages API, or the OpenAI-compatible /chat/completions shape that
@@ -111,7 +111,7 @@ export function resolveAiProviderConfig(): ResolvedProviderConfig | null {
 
 function buildConfig(id: ProviderId, apiKey: string): ResolvedProviderConfig {
   const provider = PROVIDERS[id];
-  const model = process.env.PRISM_AI_MODEL || provider.defaultModel;
+  const model = getModel(id) || provider.defaultModel;
   const baseUrl = id === "custom" ? process.env.PRISM_AI_BASE_URL : provider.baseUrl;
 
   if (id === "custom" && (!baseUrl || !model)) {

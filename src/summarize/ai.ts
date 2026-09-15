@@ -22,7 +22,7 @@ export async function createAiSummarizer(): Promise<Summarizer> {
   if (!config) return createTemplateSummarizer();
 
   if (config.provider.wireFormat === "anthropic") {
-    return createAnthropicSummarizer(config.apiKey, config.model);
+    return createAnthropicSummarizer(config.apiKey, config.model, config.provider.id);
   }
   return createOpenAiCompatibleSummarizer(config);
 }

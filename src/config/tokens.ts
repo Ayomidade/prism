@@ -75,3 +75,53 @@ export function setProviderKey(providerId: string, key: string): void {
   mkdirSync(CONFIG_DIR, { recursive: true });
   writeFileSync(join(CONFIG_DIR, `${providerId}-key`), key + "\n", { mode: 0o600 });
 }
+
+/**
+ * Reads the model override for an AI provider. Checks (in order):
+ *   1. PRISM_AI_MODEL env var (global override, backwards-compatible)
+ *   2. ~/.config/prism/<provider>-model file
+ *
+ * @returns The model string, or undefined if not configured (caller should use default)
+ */
+export function getModel(providerId: string): string | undefined {
+  const envModel = process.env.PRISM_AI_MODEL;
+  if (envModel) return envModel;
+
+  const modelFile = join(CONFIG_DIR, `${providerId}-model`);
+  if (existsSync(modelFile)) {
+    try {
+      return readFileSync(modelFile, "utf-8").trim();
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Stores a model override for an AI provider to ~/.config/prism/<provider>-model.
+ * Creates the config directory if it doesn't exist.
+ */
+export function setModel(providerId: string, model: string): void {
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  writeFileSync(join(CONFIG_DIR, `${providerId}-model`), model + "\n", { mode: 0o600 });
+}
+
+/**
+ * Returns the full configuration state for display in `prism config show`.
+ * Does NOT return sensitive values (keys/tokens) — only whether they exist.
+ */
+export function listConfig(): {
+  githubToken: boolean;
+  providers: { id: string; keySet: boolean; model: string | undefined }[];
+} {
+  return {
+    githubToken: !!getGitHubToken(),
+    providers: ["anthropic", "openai", "gemini", "groq", "custom"].map((id) => ({
+      id,
+      keySet: !!getProviderKey(id),
+      model: getModel(id),
+    })),
+  };
+}

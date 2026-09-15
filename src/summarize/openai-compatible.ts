@@ -31,7 +31,7 @@ export function createOpenAiCompatibleSummarizer(config: ResolvedProviderConfig)
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(
-        `${config.provider.id} API error (${response.status}): ${body.slice(0, 200)}`
+        `${config.provider.id} (${config.model}) API error ${response.status}: ${body.slice(0, 200)}`
       );
     }
 
@@ -58,7 +58,7 @@ export function createOpenAiCompatibleSummarizer(config: ResolvedProviderConfig)
         };
       } catch (err: any) {
         return {
-          text: `${templateHeader}\n\n(AI analysis unavailable: ${err.message})`,
+          text: `${templateHeader}\n\n(AI analysis unavailable: ${config.provider.id} (${config.model}) — ${err.message})`,
           confidence: "documented",
         };
       }

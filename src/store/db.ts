@@ -109,8 +109,9 @@ export function openDatabase(dbPath: string): Database.Database {
     // runs can detect staleness.
     setStoredSchemaVersion(db, SCHEMA_VERSION);
   } else if (storedVersion !== SCHEMA_VERSION) {
-    // Stale database — close it and tell the user exactly what to do.
-    db.close();
+    // Don't call db.close() — better-sqlite3 crashes during Node.js
+    // process teardown (see Troubleshooting in docs/usage.md). Let the
+    // process exit naturally after the throw instead.
     throw new Error(
       `PRISM database schema is out of date (found v${storedVersion}, expected v${SCHEMA_VERSION}). ` +
         `Run "prism init --refresh" to rebuild the index.`,

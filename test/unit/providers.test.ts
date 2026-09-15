@@ -1,5 +1,14 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { resolveAiProviderConfig } from "../../src/summarize/providers.js";
+import { describe, it, expect, afterEach, vi } from "vitest";
+
+// Mock tokens.ts so tests only read from env vars, never from real files.
+// This prevents tests from being affected by (or corrupting) a developer's
+// actual ~/.config/prism/ configuration.
+vi.mock("../../src/config/tokens.js", () => ({
+  getProviderKey: (id: string) => process.env[`PRISM_${id.toUpperCase()}_KEY`],
+  getModel: (id: string) => process.env.PRISM_AI_MODEL,
+}));
+
+const { resolveAiProviderConfig } = await import("../../src/summarize/providers.js");
 
 // Tests for provider resolution logic — the branching logic that
 // determines which AI provider (if any) is used. This is the most
@@ -243,5 +252,35 @@ describe("resolveAiProviderConfig", () => {
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("openai");
+  });
+
+  // ── Model resolution ────────────────────────────────────────────
+
+  it("uses provider defaultModel when no model override is set", () => {
+    process.env.PRISM_AI_PROVIDER = "openai";
+    process.env.PRISM_OPENAI_KEY = "sk-test";
+    delete process.env.PRISM_AI_MODEL;
+
+    const config = resolveAiProviderConfig();
+    expect(config!.model).toBe("gpt-4o-mini");
+  });
+
+  it("PRISM_AI_MODEL env var overrides default for any provider", () => {
+    process.env.PRISM_AI_PROVIDER = "groq";
+    process.env.PRISM_GROQ_KEY = "gsk_test";
+    process.env.PRISM_AI_MODEL = "llama-3.1-8b-instant";
+
+    const config = resolveAiProviderConfig();
+    expect(config!.model).toBe("llama-3.1-8b-instant");
+  });
+
+  it("PRISM_AI_MODEL applies globally to whichever provider is detected", () => {
+    delete process.env.PRISM_AI_PROVIDER;
+    process.env.PRISM_ANTHROPIC_KEY = "sk-ant-test";
+    process.env.PRISM_AI_MODEL = "claude-3-haiku-20240307";
+
+    const config = resolveAiProviderConfig();
+    expect(config!.provider.id).toBe("anthropic");
+    expect(config!.model).toBe("claude-3-haiku-20240307");
   });
 });

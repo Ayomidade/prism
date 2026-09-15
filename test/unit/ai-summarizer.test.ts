@@ -127,6 +127,7 @@ describe("Anthropic provider (mocked)", () => {
 
     expect(result.confidence).toBe("documented");
     expect(result.text).toContain("AI analysis unavailable");
+    expect(result.text).toContain("anthropic");
     expect(result.text).toContain("Invalid API key");
   });
 

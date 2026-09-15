@@ -6,7 +6,8 @@ const MAX_TOKENS = 1024;
 
 export async function createAnthropicSummarizer(
   apiKey: string,
-  model: string
+  model: string,
+  providerName: string = "anthropic"
 ): Promise<Summarizer> {
   let Anthropic: any;
   try {
@@ -44,7 +45,7 @@ export async function createAnthropicSummarizer(
         return { text: `${templateHeader}\n\nAI analysis:\n${aiText}`, confidence: "ai-inferred" };
       } catch (err: any) {
         return {
-          text: `${templateHeader}\n\n(AI analysis unavailable: ${err.message})`,
+          text: `${templateHeader}\n\n(AI analysis unavailable: ${providerName} (${model}) — ${err.message})`,
           confidence: "documented",
         };
       }
