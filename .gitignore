@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.prim/
+.prism/
 *.log
 .env
 .DS_Store
