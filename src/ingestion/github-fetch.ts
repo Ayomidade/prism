@@ -62,8 +62,7 @@ for (const link of links) {
   inserted++;
 }
 
-db.close();
-// Force immediate exit to prevent better-sqlite3 destructor crash
-// during Node.js process teardown (RemoveEnvironmentCleanupHook assertion).
+// Don't call db.close() — better-sqlite3 crashes during Node.js
+// process teardown. Data is flushed via WAL; process.exit forces exit.
 process.exit(0);
 
