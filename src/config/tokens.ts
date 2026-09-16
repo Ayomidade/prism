@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
@@ -124,4 +124,29 @@ export function listConfig(): {
       model: getModel(id),
     })),
   };
+}
+
+/**
+ * Removes an AI provider's key file from ~/.config/prism/.
+ * Returns true if a file was deleted, false if no file existed.
+ */
+export function removeProviderKey(providerId: string): boolean {
+  const keyFile = join(CONFIG_DIR, `${providerId}-key`);
+  if (existsSync(keyFile)) {
+    rmSync(keyFile);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Removes the GitHub token file from ~/.config/prism/.
+ * Returns true if a file was deleted, false if no file existed.
+ */
+export function removeGitHubToken(): boolean {
+  if (existsSync(TOKEN_FILE)) {
+    rmSync(TOKEN_FILE);
+    return true;
+  }
+  return false;
 }

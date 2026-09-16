@@ -112,6 +112,19 @@ export async function fetchAvailableModels(
     throw new Error(`Failed to list models (${response.status})`);
   }
 
-  const data = (await response.json()) as { data?: { id: string }[] };
-  return (data.data ?? []).map((m) => m.id).sort();
+  const data = (await response.json()) as any;
+
+  // OpenAI format: { data: [{ id: "model-name" }] }
+  if (Array.isArray(data.data)) {
+    return data.data.map((m: { id: string }) => m.id).sort();
+  }
+
+  // Gemini native format: { models: [{ name: "models/model-name" }] }
+  if (Array.isArray(data.models)) {
+    return data.models
+      .map((m: { name: string }) => m.name.replace(/^models\//, ""))
+      .sort();
+  }
+
+  return [];
 }

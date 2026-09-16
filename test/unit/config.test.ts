@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync, rmSync, mkdtempSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -58,5 +58,29 @@ describe("prism config set-key", () => {
     fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
     const { exitCode } = run(fakeHome, "config", "set-key");
     expect(exitCode).toBe(1);
+  });
+});
+
+// ── removeProviderKey (unit test) ──────────────────────────────
+
+import { removeProviderKey } from "../../src/config/tokens.js";
+import { homedir } from "node:os";
+
+describe("removeProviderKey", () => {
+  const configDir = join(homedir(), ".config", "prism");
+
+  it("removes an existing key file", () => {
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(join(configDir, "testremove-key"), "test-key\n", { mode: 0o600 });
+
+    expect(existsSync(join(configDir, "testremove-key"))).toBe(true);
+    const removed = removeProviderKey("testremove");
+    expect(removed).toBe(true);
+    expect(existsSync(join(configDir, "testremove-key"))).toBe(false);
+  });
+
+  it("returns false when no key file exists", () => {
+    const removed = removeProviderKey("nonexistent-provider-xyz");
+    expect(removed).toBe(false);
   });
 });

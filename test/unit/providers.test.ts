@@ -341,7 +341,12 @@ describe("fetchModelsForProvider", () => {
   it("fetches models for gemini provider with x-goog-api-key header", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ data: [{ id: "gemini-3.6-flash" }, { id: "gemini-2.5-pro" }] }),
+      json: async () => ({
+        models: [
+          { name: "models/gemini-3.6-flash" },
+          { name: "models/gemini-2.5-pro" },
+        ],
+      }),
     });
 
     const models = await fetchModelsForProvider("gemini", "test-gemini-key");
