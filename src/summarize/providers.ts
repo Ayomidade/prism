@@ -15,6 +15,7 @@ export interface ProviderDefinition {
   wireFormat: "anthropic" | "openai-compatible";
   baseUrl?: string; // undefined for anthropic (uses the SDK directly)
   defaultModel: string;
+  authFormat: "bearer" | "x-goog-api-key";
 }
 
 // Default models are current as of this writing and deliberately
@@ -26,33 +27,34 @@ const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     id: "anthropic",
     wireFormat: "anthropic",
     defaultModel: "claude-sonnet-4-20250514",
+    authFormat: "bearer",
   },
   openai: {
     id: "openai",
     wireFormat: "openai-compatible",
     baseUrl: "https://api.openai.com/v1",
     defaultModel: "gpt-4o-mini",
+    authFormat: "bearer",
   },
   gemini: {
     id: "gemini",
     wireFormat: "openai-compatible",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
     defaultModel: "gemini-3.6-flash",
+    authFormat: "x-goog-api-key",
   },
   groq: {
     id: "groq",
     wireFormat: "openai-compatible",
     baseUrl: "https://api.groq.com/openai/v1",
     defaultModel: "llama-3.3-70b-versatile",
+    authFormat: "bearer",
   },
-  // Escape hatch for anything else speaking the OpenAI-compatible shape —
-  // OpenRouter (which hosts many free-tier models), a local Ollama server,
-  // or any future provider. No hardcoded assumptions about which one; the
-  // user points it wherever they want via PRISM_AI_BASE_URL / PRISM_AI_MODEL.
   custom: {
     id: "custom",
     wireFormat: "openai-compatible",
-    defaultModel: "", // must come from PRISM_AI_MODEL — no sensible default
+    defaultModel: "",
+    authFormat: "bearer",
   },
 };
 
@@ -145,5 +147,5 @@ export async function fetchModelsForProvider(
   if (!url) {
     throw new Error(`No base URL available to list models for "${id}"`);
   }
-  return fetchOpenAiCompatibleModels(url, apiKey);
+  return fetchOpenAiCompatibleModels(url, apiKey, provider.authFormat);
 }

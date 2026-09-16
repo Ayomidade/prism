@@ -338,6 +338,21 @@ describe("fetchModelsForProvider", () => {
     });
   });
 
+  it("fetches models for gemini provider with x-goog-api-key header", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: "gemini-3.6-flash" }, { id: "gemini-2.5-pro" }] }),
+    });
+
+    const models = await fetchModelsForProvider("gemini", "test-gemini-key");
+    expect(models).toEqual(["gemini-2.5-pro", "gemini-3.6-flash"]);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://generativelanguage.googleapis.com/v1beta/models",
+      { headers: { "x-goog-api-key": "test-gemini-key" } }
+    );
+  });
+
   it("fetches models for custom provider with base URL", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

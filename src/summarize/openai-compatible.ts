@@ -96,10 +96,17 @@ export function createOpenAiCompatibleSummarizer(config: ResolvedProviderConfig)
  * avoids exactly the problem of a hardcoded default going stale
  * (e.g. Groq deprecating llama-3.3-70b-versatile).
  */
-export async function fetchAvailableModels(baseUrl: string, apiKey: string): Promise<string[]> {
-  const response = await fetch(`${baseUrl}/models`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+export async function fetchAvailableModels(
+  baseUrl: string,
+  apiKey: string,
+  authFormat: "bearer" | "x-goog-api-key" = "bearer"
+): Promise<string[]> {
+  const headers: Record<string, string> =
+    authFormat === "x-goog-api-key"
+      ? { "x-goog-api-key": apiKey }
+      : { Authorization: `Bearer ${apiKey}` };
+
+  const response = await fetch(`${baseUrl}/models`, { headers });
 
   if (!response.ok) {
     throw new Error(`Failed to list models (${response.status})`);
