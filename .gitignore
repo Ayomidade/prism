@@ -9,3 +9,4 @@ coverage/
 # catches any temp test directories (e.g. test-tmp-integration/).
 test-tmp*/
 impact-report.html
+out.html
