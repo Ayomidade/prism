@@ -306,7 +306,16 @@ describe("queryDependents", () => {
     // Who calls helper? main (directly). Nobody calls main.
     const deps = queryDependents(db, ids.helper);
     expect(deps).toHaveLength(1);
-    expect(deps[0]).toEqual({ file: "src/graph.ts", symbol: "main", kind: "function", depth: 1 });
+    expect(deps[0]).toEqual({
+      file: "src/graph.ts",
+      symbol: "main",
+      kind: "function",
+      depth: 1,
+      edgeType: "calls",
+      symbolId: ids.main,
+      startLine: 1,
+      endLine: 10,
+    });
   });
 
   it("returns empty for a symbol nobody depends on", () => {

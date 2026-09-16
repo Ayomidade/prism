@@ -4,6 +4,8 @@ import { resolveSymbol, queryDependents, listSymbolsByName } from "../../graph/q
 import { existsSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { generateImpactHtml } from "../output/html.js";
+import { enrichDependents } from "../../summarize/enrich.js";
+import { createAiImpactSummarizer } from "../../summarize/impact-factory.js";
 import type { Dependent } from "../../graph/query.js";
 
 // Build spec: docs/prism-v1-build-spec.md Section 5 (`prism impact`)
@@ -105,6 +107,8 @@ export function registerImpactCommand(program: Command): void {
 
         const target = `${resolved.file}:${resolved.name}`;
         const dependents = queryDependents(db, resolved.id);
+        const enriched = enrichDependents(db, dependents, repoRoot);
+        const impactSummarizer = await createAiImpactSummarizer();
 
         if (options.html) {
           // Determine output path
@@ -122,16 +126,23 @@ export function registerImpactCommand(program: Command): void {
             // No remote configured — use directory name
           }
 
+          const result = await impactSummarizer.summarizeImpact(target, enriched);
           const html = generateImpactHtml(target, dependents, {
             repoName,
             generatedAt: new Date().toISOString(),
+            aiSummary: result.text,
           });
           writeFileSync(htmlPath, html, "utf-8");
           console.log(`HTML report written to ${htmlPath}`);
         } else if (options.json) {
-          console.log(JSON.stringify({ target, dependents }, null, 2));
+          const result = await impactSummarizer.summarizeImpactJson(target, enriched);
+          console.log(JSON.stringify({ ...result, dependents }, null, 2));
         } else {
           console.log(formatTree(target, dependents));
+          const result = await impactSummarizer.summarizeImpact(target, enriched);
+          console.log("");
+          console.log("AI Impact Analysis:");
+          console.log(result.text);
         }
       } finally {
         // Don't call db.close() — better-sqlite3 crashes during Node.js

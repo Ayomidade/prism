@@ -38,12 +38,13 @@ export function escapeHtml(str: string): string {
 export function generateImpactHtml(
   target: string,
   dependents: Dependent[],
-  options?: { repoName?: string; generatedAt?: string },
+  options?: { repoName?: string; generatedAt?: string; aiSummary?: string },
 ): string {
   const safeTarget = escapeHtml(target);
   const safeRepo = escapeHtml(options?.repoName ?? "Repository");
   const timestamp = options?.generatedAt ?? new Date().toISOString();
   const safeTimestamp = escapeHtml(timestamp);
+  const safeAiSummary = options?.aiSummary ? escapeHtml(options.aiSummary) : null;
   const count = dependents.length;
 
   // Group dependents by file for the tree view
@@ -230,6 +231,23 @@ export function generateImpactHtml(
     vertical-align: middle;
   }
 
+  /* ── AI Analysis ──────────────────────────────────────────────────── */
+  .ai-section {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .ai-section h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #334155;
+  }
+  .ai-summary {
+    color: #475569;
+    line-height: 1.7;
+    white-space: pre-wrap;
+  }
+
   /* ── Empty state ───────────────────────────────────────────────────── */
   .empty {
     color: #64748b;
@@ -294,6 +312,13 @@ export function generateImpactHtml(
       <div class="stat-label">Files Affected</div>
     </div>
   </div>
+
+  ${safeAiSummary ? `
+  <div class="ai-section">
+    <h2>AI Impact Analysis</h2>
+    <div class="ai-summary">${safeAiSummary}</div>
+  </div>
+  ` : ""}
 
   <div class="tree-section">
     <h2>Affected Dependencies</h2>

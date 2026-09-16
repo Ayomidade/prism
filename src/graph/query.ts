@@ -17,6 +17,10 @@ export interface Dependent {
   symbol: string;
   kind: string;
   depth: number;
+  edgeType: string;
+  symbolId: number;
+  startLine: number;
+  endLine: number;
 }
 
 export interface ResolvedSymbol {
@@ -174,6 +178,47 @@ export function queryHistoryForFunction(
 }
 
 /**
+ * Looks up commit history for a symbol by its ID.
+ * More precise than queryHistoryForFunction (no ambiguity).
+ *
+ * @param db        - Open SQLite database
+ * @param symbolId  - ID of the symbol
+ * @param limit     - Maximum number of history entries to return (default: 5)
+ */
+export function queryHistoryForSymbolId(
+  db: Database.Database,
+  symbolId: number,
+  limit: number = 5
+): HistoryEntry[] {
+  const symbol = db
+    .prepare(
+      `SELECT s.file_id, s.start_line, s.end_line
+       FROM symbols s
+       WHERE s.id = ?`
+    )
+    .get(symbolId) as
+    | { file_id: number; start_line: number; end_line: number }
+    | undefined;
+
+  if (!symbol) return [];
+
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT c.sha as commitSha, c.message, c.date, c.author
+       FROM commit_files cf
+       JOIN commits c ON cf.commit_sha = c.sha
+       WHERE cf.file_id = ?
+         AND cf.start_line <= ?
+         AND (cf.end_line >= ? OR cf.end_line IS NULL)
+       ORDER BY c.date DESC
+       LIMIT ?`
+    )
+    .all(symbol.file_id, symbol.end_line, symbol.start_line, limit) as Omit<HistoryEntry, "prNumbers" | "prTitles">[];
+
+  return enrichWithPrData(db, rows);
+}
+
+/**
  * Enriches commit history rows with linked PR/issue data.
  */
 function enrichWithPrData(
@@ -255,7 +300,8 @@ export function queryDependents(
   visited.add(symbolId);
 
   const findParents = db.prepare(
-    `SELECT DISTINCT s.id, s.name as symbol, s.kind as kind, f.path as file
+    `SELECT DISTINCT s.id, s.name as symbol, s.kind as kind, f.path as file,
+            e.edge_type as edgeType, s.start_line as startLine, s.end_line as endLine
      FROM edges e
      JOIN symbols s ON e.from_symbol_id = s.id
      JOIN files f ON s.file_id = f.id
@@ -271,6 +317,9 @@ export function queryDependents(
       symbol: string;
       kind: string;
       file: string;
+      edgeType: string;
+      startLine: number;
+      endLine: number;
     }[];
 
     for (const parent of parents) {
@@ -282,6 +331,10 @@ export function queryDependents(
         symbol: parent.symbol,
         kind: parent.kind,
         depth: current.depth + 1,
+        edgeType: parent.edgeType,
+        symbolId: parent.id,
+        startLine: parent.startLine,
+        endLine: parent.endLine,
       });
 
       queue.push({ id: parent.id, depth: current.depth + 1 });

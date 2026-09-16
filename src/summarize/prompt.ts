@@ -34,7 +34,10 @@ ${historyBlock}
 Based on this commit history, provide a concise 2-3 sentence explanation of why this code exists. Focus on the purpose and intent, not just describing what the commits say. If there are PRs linked, mention them. Be specific and actionable.`;
 }
 
-export function buildTemplateHeader(history: HistoryEntry[], target: string): string {
+export function buildTemplateHeader(
+  history: HistoryEntry[],
+  target: string,
+): string {
   const lines: string[] = [];
   lines.push(`Why does ${target} exist?`);
   lines.push("");

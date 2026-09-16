@@ -216,6 +216,10 @@ describe("impact queries (integration)", () => {
       expect(dep.file.length).toBeGreaterThan(0);
       expect(dep.symbol.length).toBeGreaterThan(0);
       expect(dep.depth).toBeGreaterThanOrEqual(1);
+      expect(["calls", "imports"]).toContain(dep.edgeType);
+      expect(typeof dep.symbolId).toBe("number");
+      expect(typeof dep.startLine).toBe("number");
+      expect(typeof dep.endLine).toBe("number");
     }
   });
 
