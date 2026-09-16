@@ -55,48 +55,56 @@ export function registerConfigCommand(program: Command): void {
       }
 
       // Interactive path.
-      const chosenProvider: string =
-        provider ??
-        (await select({
-          message: "Which provider?",
-          choices: VALID_PROVIDERS.map((id) => ({ name: id, value: id })),
-        }));
-
-      const apiKey = getProviderKey(chosenProvider);
-      if (!apiKey) {
-        console.error(
-          `No key configured for "${chosenProvider}". Run: prism config set-key ${chosenProvider} <key>`
-        );
-        process.exit(1);
-      }
-
-      const baseUrl = process.env.PRISM_AI_BASE_URL;
-      let chosenModel: string;
-
       try {
-        console.log(`Fetching available models for ${chosenProvider}...`);
-        const models = await fetchModelsForProvider(
-          chosenProvider as ProviderId,
-          apiKey,
-          baseUrl
-        );
+        const chosenProvider: string =
+          provider ??
+          (await select({
+            message: "Which provider?",
+            choices: VALID_PROVIDERS.map((id) => ({ name: id, value: id })),
+          }));
 
-        if (models.length === 0) throw new Error("No models returned");
+        const apiKey = getProviderKey(chosenProvider);
+        if (!apiKey) {
+          console.error(
+            `No key configured for "${chosenProvider}". Run: prism config set-key ${chosenProvider} <key>`
+          );
+          process.exit(1);
+        }
 
-        chosenModel = await select({
-          message: "Which model?",
-          choices: models.map((m) => ({ name: m, value: m })),
-        });
+        const baseUrl = process.env.PRISM_AI_BASE_URL;
+        let chosenModel: string;
+
+        try {
+          console.log(`Fetching available models for ${chosenProvider}...`);
+          const models = await fetchModelsForProvider(
+            chosenProvider as ProviderId,
+            apiKey,
+            baseUrl
+          );
+
+          if (models.length === 0) throw new Error("No models returned");
+
+          chosenModel = await select({
+            message: "Which model?",
+            choices: models.map((m) => ({ name: m, value: m })),
+          });
+        } catch (err: any) {
+          // Graceful degradation — never dead-end the command over a failed
+          // discovery call (network issue, provider doesn't support listing,
+          // custom provider with no PRISM_AI_BASE_URL set, etc.)
+          console.log(`Could not fetch model list (${err.message}). Enter one manually.`);
+          chosenModel = await input({ message: "Model name:" });
+        }
+
+        setModel(chosenProvider, chosenModel);
+        console.log(`${chosenProvider} model set to ${chosenModel}.`);
       } catch (err: any) {
-        // Graceful degradation — never dead-end the command over a failed
-        // discovery call (network issue, provider doesn't support listing,
-        // custom provider with no PRISM_AI_BASE_URL set, etc.)
-        console.log(`Could not fetch model list (${err.message}). Enter one manually.`);
-        chosenModel = await input({ message: "Model name:" });
+        if (err?.name === "ExitPromptError") {
+          console.log("\nCancelled.");
+          process.exit(0);
+        }
+        throw err;
       }
-
-      setModel(chosenProvider, chosenModel);
-      console.log(`${chosenProvider} model set to ${chosenModel}.`);
     });
 
   config
