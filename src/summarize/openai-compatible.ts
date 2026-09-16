@@ -89,3 +89,22 @@ export function createOpenAiCompatibleSummarizer(config: ResolvedProviderConfig)
     },
   };
 }
+
+/**
+ * Fetches the live list of model IDs from an OpenAI-compatible /models
+ * endpoint. Used for interactive model selection — querying live
+ * avoids exactly the problem of a hardcoded default going stale
+ * (e.g. Groq deprecating llama-3.3-70b-versatile).
+ */
+export async function fetchAvailableModels(baseUrl: string, apiKey: string): Promise<string[]> {
+  const response = await fetch(`${baseUrl}/models`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to list models (${response.status})`);
+  }
+
+  const data = (await response.json()) as { data?: { id: string }[] };
+  return (data.data ?? []).map((m) => m.id).sort();
+}

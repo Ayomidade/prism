@@ -284,3 +284,108 @@ describe("resolveAiProviderConfig", () => {
     expect(config!.model).toBe("claude-3-haiku-20240307");
   });
 });
+
+// ── fetchModelsForProvider ─────────────────────────────────────────
+
+const { fetchModelsForProvider } = await import("../../src/summarize/providers.js");
+
+describe("fetchModelsForProvider", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("fetches models for anthropic provider", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: "claude-sonnet-4" }, { id: "claude-3-haiku" }] }),
+    });
+
+    const models = await fetchModelsForProvider("anthropic", "sk-ant-test");
+    expect(models).toEqual(["claude-sonnet-4", "claude-3-haiku"]);
+
+    expect(global.fetch).toHaveBeenCalledWith("https://api.anthropic.com/v1/models", {
+      headers: { "x-api-key": "sk-ant-test", "anthropic-version": "2023-06-01" },
+    });
+  });
+
+  it("fetches models for openai provider (sorted)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: "gpt-4o" }, { id: "gpt-4o-mini" }] }),
+    });
+
+    const models = await fetchModelsForProvider("openai", "sk-test", undefined);
+    expect(models).toEqual(["gpt-4o", "gpt-4o-mini"]);
+
+    expect(global.fetch).toHaveBeenCalledWith("https://api.openai.com/v1/models", {
+      headers: { Authorization: "Bearer sk-test" },
+    });
+  });
+
+  it("fetches models for groq provider", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: "llama-3.3-70b-versatile" }] }),
+    });
+
+    const models = await fetchModelsForProvider("groq", "gsk_test");
+    expect(models).toEqual(["llama-3.3-70b-versatile"]);
+
+    expect(global.fetch).toHaveBeenCalledWith("https://api.groq.com/openai/v1/models", {
+      headers: { Authorization: "Bearer gsk_test" },
+    });
+  });
+
+  it("fetches models for custom provider with base URL", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: "local-model" }] }),
+    });
+
+    const models = await fetchModelsForProvider("custom", "test-key", "http://localhost:11434/v1");
+    expect(models).toEqual(["local-model"]);
+
+    expect(global.fetch).toHaveBeenCalledWith("http://localhost:11434/v1/models", {
+      headers: { Authorization: "Bearer test-key" },
+    });
+  });
+
+  it("throws for custom provider without base URL", async () => {
+    await expect(fetchModelsForProvider("custom", "test-key", undefined)).rejects.toThrow(
+      "No base URL available"
+    );
+  });
+
+  it("throws when API returns non-ok status", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+    });
+
+    await expect(fetchModelsForProvider("openai", "bad-key")).rejects.toThrow(
+      "Failed to list models (401)"
+    );
+  });
+
+  it("returns empty list when data array is empty", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
+    const models = await fetchModelsForProvider("openai", "sk-test");
+    expect(models).toEqual([]);
+  });
+
+  it("returns empty list when data field is missing", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    const models = await fetchModelsForProvider("openai", "sk-test");
+    expect(models).toEqual([]);
+  });
+});

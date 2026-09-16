@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",
+    "@inquirer/prompts": "^8.7.2",
     "@octokit/rest": "^21.0.0",
     "better-sqlite3": "^13.0.3",
     "chalk": "^5.3.0",

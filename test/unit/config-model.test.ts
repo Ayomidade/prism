@@ -44,9 +44,9 @@ describe("prism config set-model", () => {
     expect(exitCode).toBe(1);
   });
 
-  it("rejects missing arguments", () => {
+  it("errors when no key is configured for the provider", () => {
     fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
-    const { exitCode } = run(fakeHome, "config", "set-model");
+    const { exitCode } = run(fakeHome, "config", "set-model", "openai");
     expect(exitCode).toBe(1);
   });
 });

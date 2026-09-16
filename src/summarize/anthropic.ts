@@ -70,3 +70,21 @@ export async function createAnthropicSummarizer(
     },
   };
 }
+
+/**
+ * Fetches the live list of model IDs from Anthropic's /v1/models
+ * endpoint. Used for interactive model selection — querying live
+ * avoids exactly the problem of a hardcoded default going stale.
+ */
+export async function fetchAvailableModels(apiKey: string): Promise<string[]> {
+  const response = await fetch("https://api.anthropic.com/v1/models", {
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to list models (${response.status})`);
+  }
+
+  const data = (await response.json()) as { data?: { id: string }[] };
+  return (data.data ?? []).map((m) => m.id);
+}

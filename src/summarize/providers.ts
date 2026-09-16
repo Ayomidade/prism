@@ -1,4 +1,6 @@
 import { getProviderKey, getModel } from "../config/tokens.js";
+import { fetchAvailableModels as fetchOpenAiCompatibleModels } from "./openai-compatible.js";
+import { fetchAvailableModels as fetchAnthropicModels } from "./anthropic.js";
 
 // Known providers speak one of two wire formats: Anthropic's native
 // Messages API, or the OpenAI-compatible /chat/completions shape that
@@ -121,4 +123,27 @@ function buildConfig(id: ProviderId, apiKey: string): ResolvedProviderConfig {
   }
 
   return { provider, apiKey, model, baseUrl };
+}
+
+/**
+ * Fetches live available models for any known provider, for interactive
+ * selection. Throws if the provider doesn't support listing or the
+ * request fails — callers should catch and fall back to manual entry.
+ */
+export async function fetchModelsForProvider(
+  id: ProviderId,
+  apiKey: string,
+  baseUrl?: string
+): Promise<string[]> {
+  const provider = PROVIDERS[id];
+
+  if (provider.wireFormat === "anthropic") {
+    return fetchAnthropicModels(apiKey);
+  }
+
+  const url = id === "custom" ? baseUrl : provider.baseUrl;
+  if (!url) {
+    throw new Error(`No base URL available to list models for "${id}"`);
+  }
+  return fetchOpenAiCompatibleModels(url, apiKey);
 }
