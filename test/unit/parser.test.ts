@@ -33,6 +33,7 @@ describe("parseSourceFile", () => {
   it("parses multiple relative imports from cli/index.ts", () => {
     const result = parseSourceFile(project, "src/cli/index.ts");
     expect(result.imports).toEqual([
+      "../config/version.js",
       "./commands/init.js",
       "./commands/why.js",
       "./commands/impact.js",

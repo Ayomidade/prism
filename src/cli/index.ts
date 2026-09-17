@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { VERSION } from "../config/version.js";
 import { Command } from "commander";
 import { registerInitCommand } from "./commands/init.js";
 import { registerWhyCommand } from "./commands/why.js";
@@ -12,7 +13,7 @@ const program = new Command();
 program
   .name("prism")
   .description("Understand your codebase before you change it.")
-  .version("0.1.0");
+  .version(VERSION);
 
 registerInitCommand(program);
 registerWhyCommand(program);

@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "prism": "./dist/index.js"
+    "prism": "./dist/cli/index.js"
   },
   "files": [
     "dist",
