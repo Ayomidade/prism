@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { Project, SyntaxKind } from "ts-morph";
 
 // AST-based parsing of JS/TS files to extract symbols (functions, classes,
@@ -156,9 +157,23 @@ function collectCalls(node: { forEachDescendant: (cb: (child: any) => void) => v
  * .ts/.tsx/.js/.jsx files, excluding node_modules and dist.
  */
 export function createProject(repoRoot: string): Project {
+  const tsConfigPath = `${repoRoot}/tsconfig.json`;
+
+  if (existsSync(tsConfigPath)) {
+    return new Project({
+      tsConfigFilePath: tsConfigPath,
+      skipAddingFilesFromTsConfig: false,
+    });
+  }
+
+  // No tsconfig — bare JS project. Create a minimal project with JS
+  // parsing enabled and manually add source files.
   const project = new Project({
-    tsConfigFilePath: `${repoRoot}/tsconfig.json`,
-    skipAddingFilesFromTsConfig: false,
+    compilerOptions: { allowJs: true, checkJs: false },
   });
+  project.addSourceFilesAtPaths([
+    `${repoRoot}/src/**/*.{ts,tsx,js,jsx}`,
+    `${repoRoot}/*.{ts,tsx,js,jsx}`,
+  ]);
   return project;
 }
