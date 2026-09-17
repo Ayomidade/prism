@@ -63,7 +63,7 @@ describe("prism config set-key", () => {
 
 // ── removeProviderKey (unit test) ──────────────────────────────
 
-import { removeProviderKey } from "../../src/config/tokens.js";
+import { removeProviderKey, getActiveProvider, setActiveProvider, removeActiveProvider } from "../../src/config/tokens.js";
 import { homedir } from "node:os";
 
 describe("removeProviderKey", () => {
@@ -82,5 +82,42 @@ describe("removeProviderKey", () => {
   it("returns false when no key file exists", () => {
     const removed = removeProviderKey("nonexistent-provider-xyz");
     expect(removed).toBe(false);
+  });
+});
+
+// ── active provider (unit tests) ──────────────────────────────
+
+describe("active provider", () => {
+  const configDir = join(homedir(), ".config", "prism");
+
+  it("setActiveProvider writes a file", () => {
+    mkdirSync(configDir, { recursive: true });
+    setActiveProvider("groq");
+    expect(readFileSync(join(configDir, "active-provider"), "utf-8").trim()).toBe("groq");
+  });
+
+  it("getActiveProvider reads it back", () => {
+    mkdirSync(configDir, { recursive: true });
+    setActiveProvider("gemini");
+    expect(getActiveProvider()).toBe("gemini");
+  });
+
+  it("removeActiveProvider deletes the file", () => {
+    mkdirSync(configDir, { recursive: true });
+    setActiveProvider("anthropic");
+    expect(existsSync(join(configDir, "active-provider"))).toBe(true);
+    const removed = removeActiveProvider();
+    expect(removed).toBe(true);
+    expect(existsSync(join(configDir, "active-provider"))).toBe(false);
+  });
+
+  it("removeActiveProvider returns false when no file exists", () => {
+    const removed = removeActiveProvider();
+    expect(removed).toBe(false);
+  });
+
+  it("getActiveProvider returns undefined when no file exists", () => {
+    const removed = removeActiveProvider();
+    expect(getActiveProvider()).toBeUndefined();
   });
 });

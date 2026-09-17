@@ -5,6 +5,7 @@ import type { EnrichedDependent } from "../../src/summarize/impact-types.js";
 vi.mock("../../src/config/tokens.js", () => ({
   getProviderKey: (id: string) => process.env[`PRISM_${id.toUpperCase()}_KEY`],
   getModel: (id: string) => process.env.PRISM_AI_MODEL,
+  getActiveProvider: () => undefined,
 }));
 
 const { createTemplateImpactSummarizer } = await import("../../src/summarize/impact-template.js");

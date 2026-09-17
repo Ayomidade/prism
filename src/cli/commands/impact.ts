@@ -140,9 +140,14 @@ export function registerImpactCommand(program: Command): void {
         } else {
           console.log(formatTree(target, dependents));
           const result = await impactSummarizer.summarizeImpact(target, enriched);
-          console.log("");
-          console.log("AI Impact Analysis:");
-          console.log(result.text);
+          if (result.confidence === "ai-inferred") {
+            console.log("");
+            console.log("AI Impact Analysis:");
+            console.log(result.text);
+          } else if (result.text) {
+            console.log("");
+            console.log(result.text);
+          }
         }
       } finally {
         // Don't call db.close() — better-sqlite3 crashes during Node.js

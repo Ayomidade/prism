@@ -150,3 +150,41 @@ export function removeGitHubToken(): boolean {
   }
   return false;
 }
+
+const ACTIVE_PROVIDER_FILE = join(CONFIG_DIR, "active-provider");
+
+/**
+ * Reads the stored active provider preference.
+ * Returns undefined if no preference has been set (falls through to auto-detect).
+ */
+export function getActiveProvider(): string | undefined {
+  if (existsSync(ACTIVE_PROVIDER_FILE)) {
+    try {
+      return readFileSync(ACTIVE_PROVIDER_FILE, "utf-8").trim();
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Persists the active provider preference to ~/.config/prism/active-provider.
+ * Creates the config directory if it doesn't exist.
+ */
+export function setActiveProvider(providerId: string): void {
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  writeFileSync(ACTIVE_PROVIDER_FILE, providerId + "\n", { mode: 0o600 });
+}
+
+/**
+ * Removes the active provider preference, resetting to auto-detect.
+ * Returns true if a file was deleted, false if no file existed.
+ */
+export function removeActiveProvider(): boolean {
+  if (existsSync(ACTIVE_PROVIDER_FILE)) {
+    rmSync(ACTIVE_PROVIDER_FILE);
+    return true;
+  }
+  return false;
+}

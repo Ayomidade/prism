@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { select, input, confirm } from "@inquirer/prompts";
-import { setProviderKey, setGitHubToken, setModel, listConfig, getProviderKey, removeProviderKey, removeGitHubToken } from "../../config/tokens.js";
+import { setProviderKey, setGitHubToken, setModel, listConfig, getProviderKey, removeProviderKey, removeGitHubToken, setActiveProvider, removeActiveProvider, getActiveProvider } from "../../config/tokens.js";
 import { fetchModelsForProvider } from "../../summarize/providers.js";
 import type { ProviderId } from "../../summarize/providers.js";
 
@@ -177,6 +177,27 @@ export function registerConfigCommand(program: Command): void {
           process.exit(1);
         }
 
+        const activeProvider = getActiveProvider();
+        const autoDetectMode = !activeProvider;
+
+        // First prompt: switch or reset
+        const action = await select({
+          message: autoDetectMode
+            ? "Mode (currently auto-detect):"
+            : `Mode (currently: ${activeProvider}):`,
+          choices: [
+            { name: "Switch to a different provider", value: "switch" },
+            { name: "Reset to auto-detect", value: "reset" },
+          ],
+        });
+
+        if (action === "reset") {
+          removeActiveProvider();
+          console.log("Active provider preference removed. Will auto-detect from configured keys.");
+          return;
+        }
+
+        // Provider selection
         let chosenProvider: string;
 
         if (providersWithKeys.length === 1) {
@@ -184,7 +205,7 @@ export function registerConfigCommand(program: Command): void {
           console.log(`Only one provider configured: ${chosenProvider}`);
         } else {
           chosenProvider = await select({
-            message: "Which provider? (API key required)",
+            message: "Which provider?",
             choices: providersWithKeys.map((p) => ({
               name: `${p.id} (model: ${p.model ?? "default"})`,
               value: p.id,
@@ -192,6 +213,7 @@ export function registerConfigCommand(program: Command): void {
           });
         }
 
+        // Model selection
         const apiKey = getProviderKey(chosenProvider)!;
         const baseUrl = process.env.PRISM_AI_BASE_URL;
         let chosenModel: string;
@@ -215,6 +237,8 @@ export function registerConfigCommand(program: Command): void {
           chosenModel = await input({ message: "Model name:" });
         }
 
+        // Persist both the provider choice and its model
+        setActiveProvider(chosenProvider);
         setModel(chosenProvider, chosenModel);
         console.log(`\nSwitched to ${chosenProvider} (${chosenModel}).`);
       } catch (err: any) {
@@ -231,8 +255,10 @@ export function registerConfigCommand(program: Command): void {
     .description("Display all configured keys, tokens, and models")
     .action(() => {
       const cfg = listConfig();
+      const activeProvider = getActiveProvider();
 
       console.log("GitHub token:  " + (cfg.githubToken ? "set" : "not set"));
+      console.log("Active provider: " + (activeProvider ? `${activeProvider} (set by switch-provider)` : "auto-detect"));
       console.log("");
 
       for (const p of cfg.providers) {

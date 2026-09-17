@@ -1,4 +1,4 @@
-import { getProviderKey, getModel } from "../config/tokens.js";
+import { getProviderKey, getModel, getActiveProvider } from "../config/tokens.js";
 import { fetchAvailableModels as fetchOpenAiCompatibleModels } from "./openai-compatible.js";
 import { fetchAvailableModels as fetchAnthropicModels } from "./anthropic.js";
 
@@ -47,7 +47,7 @@ const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     id: "groq",
     wireFormat: "openai-compatible",
     baseUrl: "https://api.groq.com/openai/v1",
-    defaultModel: "llama-3.3-70b-versatile",
+    defaultModel: "openai/gpt-oss-120b",
     authFormat: "bearer",
   },
   custom: {
@@ -96,6 +96,19 @@ export function resolveAiProviderConfig(): ResolvedProviderConfig | null {
       );
     }
     return buildConfig(explicitId, key);
+  }
+
+  // Check for a stored active provider preference (set by `prism config switch-provider`).
+  const storedId = getActiveProvider() as ProviderId | undefined;
+  if (storedId && PROVIDERS[storedId]) {
+    const key = getProviderKey(storedId);
+    if (key) {
+      try {
+        return buildConfig(storedId, key);
+      } catch {
+        // Stored provider is misconfigured — fall through to auto-detect.
+      }
+    }
   }
 
   for (const id of AUTO_DETECT_ORDER) {

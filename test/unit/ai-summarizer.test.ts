@@ -6,6 +6,7 @@ vi.mock("../../src/config/tokens.js", () => ({
   getProviderKey: (id: string) => process.env[`PRISM_${id.toUpperCase()}_KEY`],
   getModel: (_id: string) => process.env.PRISM_AI_MODEL,
   getGitHubToken: () => process.env.PRISM_GITHUB_TOKEN,
+  getActiveProvider: () => undefined,
 }));
 
 // Mock the @anthropic-ai/sdk module at module scope (vitest hoists vi.mock)
