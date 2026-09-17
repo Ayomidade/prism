@@ -172,8 +172,9 @@ export function createProject(repoRoot: string): Project {
     compilerOptions: { allowJs: true, checkJs: false },
   });
   project.addSourceFilesAtPaths([
-    `${repoRoot}/src/**/*.{ts,tsx,js,jsx}`,
-    `${repoRoot}/*.{ts,tsx,js,jsx}`,
+    `${repoRoot}/**/*.{ts,tsx,js,jsx}`,
+    `!${repoRoot}/node_modules/**`,
+    `!${repoRoot}/**/node_modules/**`,
   ]);
   return project;
 }
