@@ -1,10 +1,23 @@
 import type { Command } from "commander";
 import { mkdirSync, existsSync, rmSync } from "node:fs";
 import { execFileSync, execSync } from "node:child_process";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseGitLog } from "../../ingestion/git/log.js";
 import { parseGitBlame } from "../../ingestion/git/blame.js";
 import { getGitHubToken } from "../../config/tokens.js";
+
+function runScript(name: string): { cmd: string; scriptArgs: string[] } {
+  const thisFileDir = dirname(fileURLToPath(import.meta.url));
+  // Dev: src/cli/commands/ → ../../ingestion/<name>.ts (run with tsx)
+  const devPath = join(thisFileDir, "..", "..", "ingestion", `${name}.ts`);
+  if (existsSync(devPath)) {
+    return { cmd: "npx", scriptArgs: ["tsx", devPath] };
+  }
+  // Production: dist/cli/ → ../ingestion/<name>.js (run with node)
+  const prodPath = join(thisFileDir, "..", "ingestion", `${name}.js`);
+  return { cmd: "node", scriptArgs: [prodPath] };
+}
 
 /**
  * Core init logic — index a git repository into a SQLite graph database.
@@ -69,9 +82,10 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
   console.log("  Writing to database...");
   const gitData = JSON.stringify({ commits, files: fileBlames });
   try {
+    const { cmd, scriptArgs } = runScript("db-write");
     const result = execFileSync(
-      "npx",
-      ["tsx", "src/ingestion/db-write.ts", dbPath],
+      cmd,
+      [...scriptArgs, dbPath],
       { input: gitData, cwd: repoRoot, encoding: "utf-8" }
     );
     const counts = JSON.parse(result);
@@ -92,9 +106,10 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
   const fileList = trackedFiles.join("\n");
   const parsedJson = join(repoRoot, ".prism", "parsed.json");
   try {
+    const { cmd, scriptArgs } = runScript("ast-parse");
     execFileSync(
-      "npx",
-      ["tsx", "src/ingestion/ast-parse.ts", repoRoot, parsedJson],
+      cmd,
+      [...scriptArgs, repoRoot, parsedJson],
       { input: fileList, cwd: repoRoot, encoding: "utf-8" }
     );
   } catch (err: any) {
@@ -105,9 +120,10 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
   if (existsSync(parsedJson)) {
     console.log("  Building graph...");
     try {
+      const { cmd, scriptArgs } = runScript("graph-load");
       const result = execFileSync(
-        "npx",
-        ["tsx", "src/ingestion/graph-load.ts", repoRoot, parsedJson, dbPath],
+        cmd,
+        [...scriptArgs, repoRoot, parsedJson, dbPath],
         { cwd: repoRoot, encoding: "utf-8" }
       );
       process.stdout.write(`    ${result.trim()}\n`);
@@ -122,9 +138,10 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
     console.log("  Fetching GitHub PR/issue data...");
     try {
       const shas = JSON.stringify(commits.map((c) => c.sha));
+      const { cmd, scriptArgs } = runScript("github-fetch");
       execFileSync(
-        "npx",
-        ["tsx", "src/ingestion/github-fetch.ts", dbPath],
+        cmd,
+        [...scriptArgs, dbPath],
         { input: shas, cwd: repoRoot, encoding: "utf-8" }
       );
     } catch {
