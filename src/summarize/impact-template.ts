@@ -33,7 +33,8 @@ function buildTemplateImpactSummary(target: string, dependents: EnrichedDependen
     lines.push("Direct dependents:");
     for (const dep of direct) {
       const edgeLabel = dep.edgeType === "calls" ? "calls" : "imports";
-      lines.push(`  ${dep.file}:${dep.symbol} (${dep.kind}, ${edgeLabel})`);
+      const kindLabel = dep.kind === "module" ? "top-level code" : dep.kind;
+      lines.push(`  ${dep.file}:${dep.symbol} (${kindLabel}, ${edgeLabel})`);
       if (dep.history.length > 0) {
         const recent = dep.history[0].message.split("\n")[0];
         lines.push(`    Last changed: ${dep.history[0].date.slice(0, 10)} — ${recent}`);

@@ -6,7 +6,6 @@ import { execSync } from "node:child_process";
 import { generateImpactHtml } from "../output/html.js";
 import { enrichDependents } from "../../summarize/enrich.js";
 import { createAiImpactSummarizer } from "../../summarize/impact-factory.js";
-import type { Dependent } from "../../graph/query.js";
 
 // Build spec: docs/prism-v1-build-spec.md Section 5 (`prism impact`)
 //
@@ -26,43 +25,6 @@ import type { Dependent } from "../../graph/query.js";
  *     buildGraph
  *       resolveImport
  */
-function formatTree(target: string, dependents: Dependent[]): string {
-  if (dependents.length === 0) {
-    return `No dependents found for ${target}.`;
-  }
-
-  const lines: string[] = [];
-  lines.push(`Impact of changing ${target}:`);
-  lines.push("");
-
-  // Group by file, preserving depth order within each file
-  const byFile = new Map<string, Dependent[]>();
-  for (const dep of dependents) {
-    const existing = byFile.get(dep.file);
-    if (existing) {
-      existing.push(dep);
-    } else {
-      byFile.set(dep.file, [dep]);
-    }
-  }
-
-  // Sort files alphabetically
-  const sortedFiles = [...byFile.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-
-  for (const [file, deps] of sortedFiles) {
-    lines.push(file);
-    for (const dep of deps) {
-      const indent = "  ".repeat(dep.depth);
-      const label = dep.kind === "module" ? `${dep.symbol} (top-level code)` : dep.symbol;
-      lines.push(`${indent}${label}`);
-    }
-  }
-
-  lines.push("");
-  lines.push(`${dependents.length} dependent${dependents.length === 1 ? "" : "s"} found.`);
-
-  return lines.join("\n");
-}
 
 export function registerImpactCommand(program: Command): void {
   program
@@ -138,16 +100,8 @@ export function registerImpactCommand(program: Command): void {
           const result = await impactSummarizer.summarizeImpactJson(target, enriched);
           console.log(JSON.stringify({ ...result, dependents }, null, 2));
         } else {
-          console.log(formatTree(target, dependents));
           const result = await impactSummarizer.summarizeImpact(target, enriched);
-          if (result.confidence === "ai-inferred") {
-            console.log("");
-            console.log("AI Impact Analysis:");
-            console.log(result.text);
-          } else if (result.text) {
-            console.log("");
-            console.log(result.text);
-          }
+          console.log(result.text);
         }
       } finally {
         // Don't call db.close() — better-sqlite3 crashes during Node.js
