@@ -10,3 +10,4 @@ coverage/
 test-tmp*/
 impact-report.html
 out.html
+*.tgz
