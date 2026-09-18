@@ -51,7 +51,18 @@ export function registerImpactCommand(program: Command): void {
       const db = openDatabase(dbPath);
 
       try {
-        const resolved = resolveSymbol(db, symbol);
+        // Normalize absolute paths in file:symbol format
+        let normalizedSymbol = symbol;
+        if (symbol.includes(":") && symbol.includes("/")) {
+          const colonIdx = symbol.lastIndexOf(":");
+          const filePath = symbol.substring(0, colonIdx);
+          const symName = symbol.substring(colonIdx + 1);
+          if (filePath.startsWith(repoRoot + "/") || filePath === repoRoot) {
+            normalizedSymbol = filePath.slice(repoRoot.length + 1) + ":" + symName;
+          }
+        }
+
+        const resolved = resolveSymbol(db, normalizedSymbol);
 
         if (!resolved) {
           // Check if it's ambiguous (multiple matches) or not found at all

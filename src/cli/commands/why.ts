@@ -3,6 +3,7 @@ import { openDatabase, getDbPath } from "../../store/db.js";
 import { queryHistoryForLocation, queryHistoryForFunction } from "../../graph/query.js";
 import { createAiSummarizer } from "../../summarize/ai.js";
 import { existsSync } from "node:fs";
+import { extname } from "node:path";
 import { execSync } from "node:child_process";
 
 // Build spec: docs/prism-v1-build-spec.md Section 5 (`prism why`)
@@ -67,7 +68,12 @@ export function registerWhyCommand(program: Command): void {
             process.exit(1);
           }
           target = location;
-          history = queryHistoryForLocation(db, parsed.filePath, parsed.line);
+          // Strip absolute path prefix — DB stores relative paths
+          let filePath = parsed.filePath;
+          if (filePath.startsWith(repoRoot + "/") || filePath === repoRoot) {
+            filePath = filePath.slice(repoRoot.length + 1);
+          }
+          history = queryHistoryForLocation(db, filePath, parsed.line);
         } else {
           console.error("Error: Provide a location (file:line) or use --function <name>.");
           program.help();
@@ -79,7 +85,19 @@ export function registerWhyCommand(program: Command): void {
           console.log(JSON.stringify(json, null, 2));
         } else {
           const result = await summarizer.summarize(history, target);
-          console.log(result.text);
+          let output = result.text;
+          // Add hint for unindexed file types
+          if (history.length === 0 && !options.function) {
+            const parsed = parseLocation(location!);
+            if (parsed) {
+              const ext = extname(parsed.filePath);
+              const tracked = [".ts", ".tsx", ".js", ".jsx"];
+              if (ext && !tracked.includes(ext)) {
+                output += `\nNote: ${ext} files are not currently indexed. Only ${tracked.join(", ")} files are tracked.`;
+              }
+            }
+          }
+          console.log(output);
         }
       } finally {
         // Don't call db.close() — better-sqlite3 crashes during Node.js
