@@ -44,8 +44,8 @@ export function generateImpactHtml(
   const safeTarget = escapeHtml(target);
   const safeRepo = escapeHtml(options?.repoName ?? "Repository");
   const timestamp = options?.generatedAt ?? new Date().toISOString();
-  const safeTimestamp = escapeHtml(timestamp);
-  const safeAiSummary = options?.aiSummary ? escapeHtml(options.aiSummary) : null;
+  const safeTimestamp = formatTimestamp(timestamp);
+  const safeAiSummary = options?.aiSummary ? renderMarkdown(options.aiSummary) : null;
   const count = dependents.length;
 
   // Group dependents by file for the tree view
@@ -58,7 +58,9 @@ export function generateImpactHtml(
       byFile.set(dep.file, [dep]);
     }
   }
-  const sortedFiles = [...byFile.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const sortedFiles = [...byFile.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  );
 
   // Build the tree HTML
   let treeHtml: string;
@@ -72,7 +74,9 @@ export function generateImpactHtml(
       treeHtml += `<span class="file-icon">📄</span> <span class="file-path">${safeFile}</span>`;
       treeHtml += `<ul class="tree-symbols">`;
       for (const dep of deps) {
-        const safeSymbol = escapeHtml(dep.kind === "module" ? `${dep.symbol} (top-level code)` : dep.symbol);
+        const safeSymbol = escapeHtml(
+          dep.kind === "module" ? `${dep.symbol} (top-level code)` : dep.symbol,
+        );
         const depthClass = `depth-${Math.min(dep.depth, 4)}`;
         treeHtml += `<li class="${depthClass}">`;
         treeHtml += `<span class="symbol-kind">${getKindIcon(dep)}</span> `;
@@ -91,6 +95,19 @@ export function generateImpactHtml(
   const directDeps = dependents.filter((d) => d.depth === 1).length;
   const transitiveDeps = count - directDeps;
   const uniqueFiles = sortedFiles.length;
+
+  function formatTimestamp(iso: string): string {
+    const date = new Date(iso);
+    return (
+      date.toLocaleDateString("en-us", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }) +
+      " at " +
+      date.toLocaleDateString("en-us", { hour: "numeric", minute: "2-digit" })
+    );
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -248,6 +265,24 @@ export function generateImpactHtml(
     line-height: 1.7;
     white-space: pre-wrap;
   }
+  .ai-summary pre {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+    overflow-x: auto;
+  }
+  .ai-summary code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.85rem;
+    color: #334155;
+  }
+  .ai-summary br {
+    content: '';
+    display: block;
+    margin-bottom: 0.25rem;
+  }
 
   /* ── Empty state ───────────────────────────────────────────────────── */
   .empty {
@@ -314,12 +349,16 @@ export function generateImpactHtml(
     </div>
   </div>
 
-  ${safeAiSummary ? `
+  ${
+    safeAiSummary
+      ? `
   <div class="ai-section">
     <h2>AI Impact Analysis</h2>
     <div class="ai-summary">${safeAiSummary}</div>
   </div>
-  ` : ""}
+  `
+      : ""
+  }
 
   <div class="tree-section">
     <h2>Affected Dependencies</h2>
@@ -333,6 +372,35 @@ export function generateImpactHtml(
 </div>
 </body>
 </html>`;
+}
+
+/**
+ * Formats an ISO timestamp into a human-friendly string.
+ * e.g. "2026-09-18T09:45:57.614Z" → "Sep 18, 2026 at 9:45 AM"
+ */
+function formatTimestamp(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Renders AI summary text as safe HTML.
+ * Converts markdown fenced code blocks to <pre><code> and newlines to <br>.
+ * HTML-escapes all content first for XSS safety.
+ */
+function renderMarkdown(text: string): string {
+  let safe = escapeHtml(text);
+  // Fenced code blocks: ```lang\n...\n``` → <pre><code class="lang">...</code></pre>
+  safe = safe.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="$1">$2</code></pre>');
+  // Remaining newlines → <br>
+  safe = safe.replace(/\n/g, "<br>");
+  return safe;
 }
 
 /**

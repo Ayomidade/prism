@@ -116,7 +116,8 @@ describe("generateImpactHtml", () => {
   it("includes generation timestamp", () => {
     const ts = "2026-09-11T15:00:00.000Z";
     const html = generateImpactHtml("target", [], { generatedAt: ts });
-    expect(html).toContain(ts);
+    // Timestamp is formatted as human-friendly (e.g. "Sep 11, 2026 at ...")
+    expect(html).toContain("Sep 11, 2026");
   });
 
   it("is responsive (has viewport meta tag)", () => {
