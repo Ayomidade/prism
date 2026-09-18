@@ -46,8 +46,10 @@ describe("parseSourceFile", () => {
 
   it("returns 0 symbols for a file with only calls, no declarations", () => {
     const result = parseSourceFile(project, "src/cli/index.ts");
-    // index.ts has const program and register* calls, no function/class declarations
-    expect(result.symbols.length).toBe(0);
+    // index.ts has const program and register* calls — program is a
+    // top-level const variable, now captured as a symbol
+    expect(result.symbols.length).toBe(1);
+    expect(result.symbols[0].name).toBe("program");
   });
 
   it("parses cross-directory relative imports", () => {
@@ -251,5 +253,42 @@ describe("parseSourceFile", () => {
   it("returns empty moduleCallbackRefs for a file with no function arguments", () => {
     const result = parseSourceFile(project, "src/store/schema.ts");
     expect(result.moduleCallbackRefs).toEqual([]);
+  });
+
+  // ── Gap 1: Default-exported identifiers ──────────────────────────
+
+  it("captures default-exported arrow functions as named symbols", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/components/Marquee.jsx"));
+    const marquee = result.symbols.find((s) => s.name === "Marquee");
+    expect(marquee).toBeDefined();
+    expect(marquee!.kind).toBe("export");
+  });
+
+  it("does not create a symbol named 'default'", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/components/Marquee.jsx"));
+    const defaultSymbol = result.symbols.find((s) => s.name === "default");
+    expect(defaultSymbol).toBeUndefined();
+  });
+
+  it("captures non-exported top-level const arrow functions", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/components/Marquee.jsx"));
+    const helper = result.symbols.find((s) => s.name === "helper");
+    expect(helper).toBeDefined();
+    expect(helper!.kind).toBe("export");
+  });
+
+  it("does not duplicate symbols", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/components/Marquee.jsx"));
+    const names = result.symbols.map((s) => s.name);
+    const unique = [...new Set(names)];
+    expect(names.length).toBe(unique.length);
+  });
+
+  it("captures const arrow function with correct line ranges", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/components/Marquee.jsx"));
+    const marquee = result.symbols.find((s) => s.name === "Marquee");
+    expect(marquee).toBeDefined();
+    expect(marquee!.startLine).toBeGreaterThan(0);
+    expect(marquee!.endLine).toBeGreaterThan(marquee!.startLine);
   });
 });

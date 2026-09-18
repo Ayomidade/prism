@@ -69,6 +69,8 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
   for (const [name, declarations] of sourceFile.getExportedDeclarations()) {
     // Skip if already captured as a function/class above
     if (symbols.some((s) => s.name === name)) continue;
+    // "default" is handled separately via export assignments (Gap 1 fix)
+    if (name === "default") continue;
 
     const decl = declarations[0];
     if (!decl) continue;
@@ -78,6 +80,55 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
       kind: "export",
       startLine: decl.getStartLineNumber(),
       endLine: decl.getEndLineNumber(),
+      calls: [],
+      callbackRefs: [],
+    });
+  }
+
+  // Top-level const/let variable declarations — captures arrow functions,
+  // function expressions, and other bindings that aren't function/class
+  // declarations. Needed because const Marquee = () => {} is invisible
+  // to getFunctions() and getExportedDeclarations() (when not named-exported).
+  for (const varStatement of sourceFile.getVariableStatements()) {
+    for (const varDecl of varStatement.getDeclarations()) {
+      const name = varDecl.getName();
+      if (!name) continue;
+      if (symbols.some((s) => s.name === name)) continue;
+
+      const initializer = varDecl.getInitializer();
+      if (!initializer) continue;
+
+      symbols.push({
+        name,
+        kind: "export",
+        startLine: varDecl.getStartLineNumber(),
+        endLine: varDecl.getEndLineNumber(),
+        calls: collectCalls(initializer),
+        callbackRefs: collectCallbackRefs(initializer),
+      });
+    }
+  }
+
+  // Default exports of existing identifiers — handles the React pattern:
+  //   const Marquee = () => { ... };
+  //   export default Marquee;
+  // getExportedDeclarations() returns key "default" (not "Marquee"), so
+  // the symbol was never created. Walk export assignments to find these.
+  for (const exportAssign of sourceFile.getExportAssignments()) {
+    const expression = exportAssign.getExpression();
+    if (expression.getKind() !== SyntaxKind.Identifier) continue;
+
+    const name = expression.getText();
+    if (symbols.some((s) => s.name === name)) continue;
+
+    // The variable declaration was already captured above if it's a
+    // top-level const. If not (e.g. imported re-export), use the
+    // export assignment's line range with empty calls.
+    symbols.push({
+      name,
+      kind: "export",
+      startLine: exportAssign.getStartLineNumber(),
+      endLine: exportAssign.getEndLineNumber(),
       calls: [],
       callbackRefs: [],
     });
