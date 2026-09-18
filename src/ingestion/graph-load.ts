@@ -17,6 +17,7 @@ interface ParsedSym {
   startLine: number;
   endLine: number;
   calls: string[];
+  callbackRefs: string[];
 }
 
 interface ParsedNamedImport {
@@ -31,6 +32,7 @@ interface ParsedFileJson {
   imports: string[];
   namedImports: ParsedNamedImport[];
   moduleCalls: string[];
+  moduleCallbackRefs: string[];
 }
 
 const [repoRoot, jsonPath, dbPath] = process.argv.slice(2);
@@ -105,6 +107,15 @@ for (const file of parsed) {
     }
   }
 
+  // Module-level callback ref edges — function references passed as
+  // arguments in top-level code (e.g. app.use(notFoundHandler)).
+  for (const refName of file.moduleCallbackRefs ?? []) {
+    const toSymId = resolveCallTarget(refName, localSymbols ?? new Map(), importNameToFile, fileSymbolNames);
+    if (toSymId) {
+      insertEdge(db, fromModuleId, toSymId, "calls");
+    }
+  }
+
   // Call edges
   if (!localSymbols) continue;
 
@@ -114,6 +125,15 @@ for (const file of parsed) {
 
     for (const calleeName of sym.calls) {
       const toSymId = resolveCallTarget(calleeName, localSymbols, importNameToFile, fileSymbolNames);
+      if (toSymId) {
+        insertEdge(db, fromSymId, toSymId, "calls");
+      }
+    }
+
+    // Callback ref edges — function references passed as arguments
+    // (e.g. router.use(protect) where protect is middleware).
+    for (const refName of sym.callbackRefs ?? []) {
+      const toSymId = resolveCallTarget(refName, localSymbols, importNameToFile, fileSymbolNames);
       if (toSymId) {
         insertEdge(db, fromSymId, toSymId, "calls");
       }
@@ -161,6 +181,10 @@ function resolveImport(importSpecifier: string, fromFile: string, repoRoot: stri
     target.replace(/\.js$/, ".ts"),
     target.replace(/\.js$/, ".tsx"),
     target.replace(/\.jsx$/, ".tsx"),
+    `${target}.js`,
+    `${target}.ts`,
+    `${target}.jsx`,
+    `${target}.tsx`,
     join(target, "index.ts"),
     join(target, "index.tsx"),
     join(target, "index.js"),

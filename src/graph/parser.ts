@@ -12,6 +12,8 @@ export interface ParsedSymbol {
   endLine: number;
   /** Names of functions called within this symbol's body (simple identifiers only). */
   calls: string[];
+  /** Function names passed as arguments (e.g. Express middleware: router.use(protect)). */
+  callbackRefs: string[];
 }
 
 /** A named import from a relative module — tracks which names come from where. */
@@ -27,6 +29,7 @@ export interface ParsedFile {
   imports: string[]; // resolved relative paths only — external packages excluded
   namedImports: NamedImport[]; // named imports with source tracking (for call resolution)
   moduleCalls: string[]; // calls made from top-level script code (not inside any named function/class)
+  moduleCallbackRefs: string[]; // callback refs in top-level code
 }
 
 export function parseSourceFile(project: Project, filePath: string): ParsedFile {
@@ -44,6 +47,7 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
       startLine: fn.getStartLineNumber(),
       endLine: fn.getEndLineNumber(),
       calls: collectCalls(fn),
+      callbackRefs: collectCallbackRefs(fn),
     });
   }
 
@@ -57,6 +61,7 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
       startLine: cls.getStartLineNumber(),
       endLine: cls.getEndLineNumber(),
       calls: collectCalls(cls),
+      callbackRefs: collectCallbackRefs(cls),
     });
   }
 
@@ -74,6 +79,7 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
       startLine: decl.getStartLineNumber(),
       endLine: decl.getEndLineNumber(),
       calls: [],
+      callbackRefs: [],
     });
   }
 
@@ -91,15 +97,26 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
 
     // Track named imports for call resolution.
     // Type-only imports are excluded — they don't exist at runtime.
-    // Default-only and namespace-only imports are excluded — we can't
-    // resolve individual names from them without type-checker info.
     if (importDecl.isTypeOnly()) continue;
 
-    const namedNames = importDecl.getNamedImports().map((n) => n.getName());
-    if (namedNames.length > 0) {
-      namedImports.push({ source: specifier, names: namedNames });
+    const names: string[] = importDecl.getNamedImports().map((n) => n.getName());
+
+    // Default imports resolve the same way — needed for JSX, since
+    // React components are almost always default-imported.
+    const defaultImport = importDecl.getDefaultImport();
+    if (defaultImport) {
+      names.push(defaultImport.getText());
+    }
+
+    if (names.length > 0) {
+      namedImports.push({ source: specifier, names });
     }
   }
+
+  // CommonJS require() — additive to ES imports above.
+  const requireImports = collectRequireImports(sourceFile);
+  imports.push(...requireImports.imports);
+  namedImports.push(...requireImports.namedImports);
 
   // Top-level statements — anything not already captured as a function,
   // class, or import/export declaration. Subprocess entry-point scripts
@@ -113,9 +130,11 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
   ]);
 
   const moduleCalls: string[] = [];
+  const moduleCallbackRefs: string[] = [];
   for (const statement of sourceFile.getStatements()) {
     if (capturedKinds.has(statement.getKind())) continue;
     moduleCalls.push(...collectCalls(statement));
+    moduleCallbackRefs.push(...collectCallbackRefs(statement));
   }
 
   return {
@@ -125,13 +144,16 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
     imports,
     namedImports,
     moduleCalls,
+    moduleCallbackRefs,
   };
 }
 
 /**
  * Collects simple call-expression names from a function/class body.
  *
- * Only captures direct identifier calls: `foo()` → "foo".
+ * Captures direct identifier calls: `foo()` → "foo".
+ * Captures JSX component references: `<Foo />` → "Foo".
+ * Skips require() calls (tracked as imports, not calls).
  * Skips method calls (obj.method()), calls through
  * destructuring, and any other non-simple callees — these need
  * type-checker-backed resolution to do correctly, which is out of
@@ -144,12 +166,104 @@ function collectCalls(node: { forEachDescendant: (cb: (child: any) => void) => v
       const expr = child.asKindOrThrow(SyntaxKind.CallExpression);
       const callee = expr.getExpression();
       // Only capture simple identifier calls: foo(...)
+      // Skip require() — it's tracked as an import, not a call.
       if (callee.getKind() === SyntaxKind.Identifier) {
-        calls.push(callee.getText());
+        const name = callee.getText();
+        if (name !== "require") {
+          calls.push(name);
+        }
+      }
+    }
+
+    // JSX component references: <Foo /> or <Foo>...</Foo>
+    // Capitalized tag names indicate components, not HTML elements.
+    if (child.getKind() === SyntaxKind.JsxSelfClosingElement || child.getKind() === SyntaxKind.JsxOpeningElement) {
+      const tagName = child.getTagNameNode?.()?.getText?.();
+      if (tagName && /^[A-Z]/.test(tagName)) {
+        calls.push(tagName);
       }
     }
   });
   return calls;
+}
+
+/**
+ * Collects function names passed as arguments to any call expression.
+ *
+ * This captures the Express middleware pattern where functions are passed
+ * as references rather than called directly:
+ *   router.use(protect)          → "protect"
+ *   router.post("/", validate, createHandler) → "validate", "createHandler"
+ *
+ * Skips string/number literals, arrow functions, and nested call expressions.
+ * Nested call expressions (e.g. authorize("admin")) are already captured by
+ * collectCalls as callee-position calls.
+ */
+function collectCallbackRefs(node: { forEachDescendant: (cb: (child: any) => void) => void }): string[] {
+  const refs: string[] = [];
+  node.forEachDescendant((child: any) => {
+    if (child.getKind() === SyntaxKind.CallExpression) {
+      const expr = child.asKindOrThrow(SyntaxKind.CallExpression);
+      for (const arg of expr.getArguments()) {
+        if (arg.getKind() === SyntaxKind.Identifier) {
+          refs.push(arg.getText());
+        }
+      }
+    }
+  });
+  return refs;
+}
+
+/**
+ * Detects CommonJS require() calls with relative specifiers.
+ *
+ * Handles:
+ *   const foo = require('./foo')
+ *   require('../bar')
+ *   const { a, b } = require('./baz')
+ *
+ * Returns imports (relative paths) and namedImports (for call resolution).
+ * Skips non-relative requires (external packages like 'express', 'lodash').
+ */
+function collectRequireImports(sourceFile: any): { imports: string[]; namedImports: NamedImport[] } {
+  const imports: string[] = [];
+  const namedImports: NamedImport[] = [];
+
+  sourceFile.forEachDescendant((child: any) => {
+    if (child.getKind() !== SyntaxKind.CallExpression) return;
+
+    const expr = child.asKindOrThrow(SyntaxKind.CallExpression);
+    const callee = expr.getExpression();
+    if (callee.getKind() !== SyntaxKind.Identifier) return;
+    if (callee.getText() !== "require") return;
+
+    const args = expr.getArguments();
+    if (args.length === 0) return;
+
+    const firstArg = args[0];
+    if (firstArg.getKind() !== SyntaxKind.StringLiteral) return;
+
+    const specifier = firstArg.asKindOrThrow(SyntaxKind.StringLiteral).getLiteralValue();
+    if (!specifier.startsWith(".")) return;
+
+    imports.push(specifier);
+
+    // Track destructured named imports: const { a, b } = require('./mod')
+    const parent = child.getParent();
+    if (parent && parent.getKind() === SyntaxKind.VariableDeclaration) {
+      const varDecl = parent.asKindOrThrow(SyntaxKind.VariableDeclaration);
+      const binding = varDecl.getNameNode();
+      if (binding.getKind() === SyntaxKind.ObjectBindingPattern) {
+        const bindingPattern = binding.asKindOrThrow(SyntaxKind.ObjectBindingPattern);
+        const names = bindingPattern.getElements().map((el: any) => el.getName());
+        if (names.length > 0) {
+          namedImports.push({ source: specifier, names });
+        }
+      }
+    }
+  });
+
+  return { imports, namedImports };
 }
 
 /**

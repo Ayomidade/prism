@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { resolve } from "node:path";
 import { createProject, parseSourceFile } from "../../src/graph/parser.js";
 
 const project = createProject(".");
+const fixtureRoot = resolve("test/fixtures/express-react");
+const fixtureProject = createProject(fixtureRoot);
 
 describe("parseSourceFile", () => {
   it("parses functions from a real file", () => {
@@ -143,5 +146,110 @@ describe("parseSourceFile", () => {
     expect(result.moduleCalls).toContain("insertFile");
     expect(result.moduleCalls).toContain("insertSymbol");
     expect(result.moduleCalls).toContain("insertEdge");
+  });
+
+  // ── CommonJS require() detection ─────────────────────────────────
+
+  it("detects CommonJS require() with relative specifiers", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "backend/server.js"));
+    expect(result.imports).toContain("./routes/users");
+  });
+
+  it("detects destructured CommonJS require() as namedImports", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "backend/routes/users.js"));
+    expect(result.namedImports).toContainEqual({
+      source: "../middlewares/auth",
+      names: ["protect", "authorize"],
+    });
+  });
+
+  it("skips non-relative require() (external packages)", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "backend/server.js"));
+    expect(result.imports).not.toContain("express");
+  });
+
+  it("does not capture require() as a call in collectCalls", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "backend/routes/users.js"));
+    // require should not appear in moduleCalls — it's tracked as an import
+    expect(result.moduleCalls).not.toContain("require");
+  });
+
+  // ── Default import tracking ──────────────────────────────────────
+
+  it("includes default imports in namedImports for call resolution", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/App.jsx"));
+    // App.jsx has: import UserList from './components/UserList'
+    const userListImport = result.namedImports.find((ni) => ni.source === "./components/UserList");
+    expect(userListImport).toBeDefined();
+    expect(userListImport!.names).toContain("UserList");
+  });
+
+  // ── JSX component references ─────────────────────────────────────
+
+  it("captures JSX component references as calls", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/App.jsx"));
+    // App.jsx renders <UserList /> inside the App function — captured in App's calls array
+    const appFn = result.symbols.find((s) => s.name === "App");
+    expect(appFn).toBeDefined();
+    expect(appFn!.calls).toContain("UserList");
+  });
+
+  it("does not capture lowercase JSX tags (HTML elements)", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/App.jsx"));
+    // <div>, <h1>, <ul>, <li> are HTML elements, not components
+    expect(result.moduleCalls).not.toContain("div");
+    expect(result.moduleCalls).not.toContain("h1");
+    expect(result.moduleCalls).not.toContain("ul");
+    expect(result.moduleCalls).not.toContain("li");
+  });
+
+  // ── Callback refs (Identifier arguments) ─────────────────────────
+
+  it("captures Identifier arguments as callbackRefs in top-level code", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "backend/routes/users.js"));
+    // router.use(protect) → protect is an Identifier argument
+    // router.post('/', authorize('admin'), validate, createUser) → validate, createUser are Identifier args
+    expect(result.moduleCallbackRefs).toContain("protect");
+    expect(result.moduleCallbackRefs).toContain("validate");
+    expect(result.moduleCallbackRefs).toContain("createUser");
+    expect(result.moduleCallbackRefs).toContain("listUsers");
+    expect(result.moduleCallbackRefs).toContain("deleteUser");
+  });
+
+  it("does not capture string/number literals as callbackRefs", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "backend/routes/users.js"));
+    // '/' and 'admin' are string literal arguments, not Identifier args
+    expect(result.moduleCallbackRefs).not.toContain("/");
+    expect(result.moduleCallbackRefs).not.toContain("admin");
+  });
+
+  it("captures callbackRefs from app.use() patterns", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "backend/server.js"));
+    // app.use('/api/users', userRoutes) → userRoutes is an Identifier arg
+    // app.use(notFoundHandler) → notFoundHandler is an Identifier arg
+    // app.use(errorHandler) → errorHandler is an Identifier arg
+    expect(result.moduleCallbackRefs).toContain("userRoutes");
+    expect(result.moduleCallbackRefs).toContain("notFoundHandler");
+    expect(result.moduleCallbackRefs).toContain("errorHandler");
+  });
+
+  it("captures callbackRefs from named function bodies", () => {
+    const result = parseSourceFile(fixtureProject, resolve(fixtureRoot, "frontend/src/components/UserList.jsx"));
+    const userListComponent = result.symbols.find((s) => s.name === "UserList");
+    expect(userListComponent).toBeDefined();
+    // UserList calls fetchUsers() — direct call captured in calls
+    expect(userListComponent!.calls).toContain("fetchUsers");
+  });
+
+  it("returns empty callbackRefs for symbols with no arguments", () => {
+    const result = parseSourceFile(project, "src/store/schema.ts");
+    const version = result.symbols.find((s) => s.name === "SCHEMA_VERSION");
+    expect(version).toBeDefined();
+    expect(version!.callbackRefs).toEqual([]);
+  });
+
+  it("returns empty moduleCallbackRefs for a file with no function arguments", () => {
+    const result = parseSourceFile(project, "src/store/schema.ts");
+    expect(result.moduleCallbackRefs).toEqual([]);
   });
 });
