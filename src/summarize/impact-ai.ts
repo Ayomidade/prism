@@ -2,6 +2,7 @@ import type { ResolvedProviderConfig } from "./providers.js";
 import type { ImpactSummarizer } from "./impact-types.js";
 import { buildImpactPrompt } from "./impact-prompt.js";
 import { createTemplateImpactSummarizer } from "./impact-template.js";
+import { parseApiError } from "./api-error.js";
 
 const MAX_TOKENS = 1024;
 
@@ -62,7 +63,7 @@ export function createAiOpenAiImpactSummarizer(
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(
-        `${config.provider.id} (${config.model}) API error ${response.status}: ${body.slice(0, 200)}`
+        `${config.provider.id} (${config.model}) API error ${response.status}: ${parseApiError(body)}`
       );
     }
 

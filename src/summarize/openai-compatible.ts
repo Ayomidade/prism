@@ -2,6 +2,7 @@ import type { HistoryEntry } from "../graph/query.js";
 import type { SummaryResult, Summarizer } from "./types.js";
 import { buildPrompt, buildTemplateHeader } from "./prompt.js";
 import type { ResolvedProviderConfig } from "./providers.js";
+import { parseApiError } from "./api-error.js";
 
 // Generic summarizer for any provider speaking the OpenAI-compatible
 // /chat/completions wire format — OpenAI, Gemini, Groq, and a custom
@@ -31,7 +32,7 @@ export function createOpenAiCompatibleSummarizer(config: ResolvedProviderConfig)
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(
-        `${config.provider.id} (${config.model}) API error ${response.status}: ${body.slice(0, 200)}`
+        `${config.provider.id} (${config.model}) API error ${response.status}: ${parseApiError(body)}`
       );
     }
 
