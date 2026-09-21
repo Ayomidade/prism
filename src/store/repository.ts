@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 
 // Read/write helpers for graph data. Keeps raw SQL out of the graph/ and
-// ingestion/ layers. See docs/prism-v1-build-spec.md Section 3 for the schema
+// ingestion/ layers. See docs/tracecode-v1-build-spec.md Section 3 for the schema
 // these methods operate on.
 
 /**
@@ -101,10 +101,16 @@ export function insertPrIssueLink(
   prNumber: number | undefined,
   issueNumber: number | undefined,
   title: string | undefined,
-  body: string | undefined
+  body: string | undefined,
 ): void {
   db.prepare(
     `INSERT OR IGNORE INTO pr_issue_links (commit_sha, pr_number, issue_number, title, body)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(commitSha, prNumber ?? null, issueNumber ?? null, title ?? null, body ?? null);
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(
+    commitSha,
+    prNumber ?? null,
+    issueNumber ?? null,
+    title ?? null,
+    body ?? null,
+  );
 }

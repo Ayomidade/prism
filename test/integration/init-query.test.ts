@@ -21,15 +21,15 @@ import {
 // during Node.js process teardown (RemoveEnvironmentCleanupHook assertion).
 // Data is already flushed via WAL; GC handles cleanup.
 
-const DB_PATH = ".prism/graph.db";
+const DB_PATH = ".tracecode/graph.db";
 const REPO_ROOT = ".";
 
 // The init pipeline spawns child processes and needs time for git + AST parsing.
 const INIT_TIMEOUT = 240_000;
 
 beforeAll(() => {
-  mkdirSync(".prism", { recursive: true });
-  // Spawn prism init via CLI — isolates ts-morph in a child process
+  mkdirSync(".tracecode", { recursive: true });
+  // Spawn tracecode init via CLI — isolates ts-morph in a child process
   const result = execFileSync("npx", ["tsx", "src/cli/index.ts", "init"], {
     cwd: REPO_ROOT,
     encoding: "utf-8",
@@ -53,7 +53,9 @@ describe("init pipeline (integration)", () => {
   it("creates a valid database with all required tables", () => {
     const db = openDatabase(DB_PATH);
     const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      )
       .all() as { name: string }[];
     const tableNames = tables.map((t) => t.name);
 
@@ -67,19 +69,25 @@ describe("init pipeline (integration)", () => {
 
   it("indexes commits from the repo", () => {
     const db = openDatabase(DB_PATH);
-    const count = db.prepare("SELECT COUNT(*) as c FROM commits").get() as { c: number };
+    const count = db.prepare("SELECT COUNT(*) as c FROM commits").get() as {
+      c: number;
+    };
     expect(count.c).toBeGreaterThan(5);
   });
 
   it("indexes source files", () => {
     const db = openDatabase(DB_PATH);
-    const count = db.prepare("SELECT COUNT(*) as c FROM files").get() as { c: number };
+    const count = db.prepare("SELECT COUNT(*) as c FROM files").get() as {
+      c: number;
+    };
     expect(count.c).toBeGreaterThan(10);
   });
 
   it("indexes symbols from AST parsing", () => {
     const db = openDatabase(DB_PATH);
-    const count = db.prepare("SELECT COUNT(*) as c FROM symbols").get() as { c: number };
+    const count = db.prepare("SELECT COUNT(*) as c FROM symbols").get() as {
+      c: number;
+    };
     expect(count.c).toBeGreaterThan(20);
   });
 
@@ -98,7 +106,9 @@ describe("init pipeline (integration)", () => {
 
   it("populates commit_files from git blame", () => {
     const db = openDatabase(DB_PATH);
-    const count = db.prepare("SELECT COUNT(*) as c FROM commit_files").get() as { c: number };
+    const count = db
+      .prepare("SELECT COUNT(*) as c FROM commit_files")
+      .get() as { c: number };
     expect(count.c).toBeGreaterThan(100);
   });
 
@@ -106,7 +116,7 @@ describe("init pipeline (integration)", () => {
     const db = openDatabase(DB_PATH);
     const dupes = db
       .prepare(
-        "SELECT file_id, COUNT(*) as c FROM symbols WHERE kind = 'module' GROUP BY file_id HAVING c > 1"
+        "SELECT file_id, COUNT(*) as c FROM symbols WHERE kind = 'module' GROUP BY file_id HAVING c > 1",
       )
       .all() as Array<{ file_id: number; c: number }>;
     expect(dupes).toEqual([]);
@@ -129,7 +139,7 @@ describe("init pipeline (integration)", () => {
     // Module symbol should have call edges
     const callEdges = db
       .prepare(
-        "SELECT COUNT(*) as c FROM edges WHERE from_symbol_id = (SELECT id FROM symbols WHERE file_id = ? AND kind = 'module') AND edge_type = 'calls'"
+        "SELECT COUNT(*) as c FROM edges WHERE from_symbol_id = (SELECT id FROM symbols WHERE file_id = ? AND kind = 'module') AND edge_type = 'calls'",
       )
       .get(file!.id) as { c: number };
     expect(callEdges.c).toBeGreaterThan(0);
@@ -252,7 +262,7 @@ function runCli(...args: string[]): string {
   });
 }
 
-describe("prism impact --html (integration)", () => {
+describe("tracecode impact --html (integration)", () => {
   const htmlPath = "test-tmp-integration/integration-test-report.html";
 
   beforeAll(() => {
@@ -280,7 +290,7 @@ describe("prism impact --html (integration)", () => {
   });
 });
 
-describe("prism why --json (integration)", () => {
+describe("tracecode why --json (integration)", () => {
   it("returns valid JSON with the expected shape", () => {
     const output = runCli("why", "src/store/db.ts:54", "--json");
     const parsed = JSON.parse(output);

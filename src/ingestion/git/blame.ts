@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 // Parses `git blame --porcelain <file>` to map each line in the file back
-// to the commit that introduced it. See docs/prism-v1-build-spec.md Section 7, step 3.
+// to the commit that introduced it. See docs/tracecode-v1-build-spec.md Section 7, step 3.
 
 export interface BlameLine {
   line: number;
@@ -30,7 +30,7 @@ const HEADER_RE = /^([0-9a-f]{40}) (\d+) (\d+)(?: \d+)?$/;
  */
 export async function parseGitBlame(
   repoRoot: string,
-  filePath: string
+  filePath: string,
 ): Promise<BlameLine[]> {
   let raw: string;
   try {

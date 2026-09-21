@@ -1,13 +1,17 @@
 import type { Command } from "commander";
 import { openDatabase, getDbPath } from "../../store/db.js";
-import { resolveSymbol, queryDependents, listSymbolsByName } from "../../graph/query.js";
+import {
+  resolveSymbol,
+  queryDependents,
+  listSymbolsByName,
+} from "../../graph/query.js";
 import { existsSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { generateImpactHtml } from "../output/html.js";
 import { enrichDependents } from "../../summarize/enrich.js";
 import { createAiImpactSummarizer } from "../../summarize/impact-factory.js";
 
-// Build spec: docs/prism-v1-build-spec.md Section 5 (`prism impact`)
+// Build spec: docs/tracecode-v1-build-spec.md Section 5 (`tracecode impact`)
 //
 // Responsibilities:
 // - Resolve the symbol (disambiguate by file path if the name is ambiguous)
@@ -32,91 +36,116 @@ export function registerImpactCommand(program: Command): void {
     .description("Show what could break if a symbol changes")
     .argument("<symbol>", "Symbol name, or file:symbol to disambiguate")
     .option("--json", "Output as JSON instead of a tree")
-    .option("--html [path]", "Export as a standalone HTML report (default: impact-report.html)")
-    .action(async (symbol: string, options: { json?: boolean; html?: string | boolean }) => {
-      let repoRoot: string;
-      try {
-        repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
-      } catch {
-        console.error("Error: Not inside a git repository.");
-        process.exit(1);
-      }
-
-      const dbPath = getDbPath(repoRoot);
-      if (!existsSync(dbPath)) {
-        console.error("Error: No indexed data found. Run `prism init` first.");
-        process.exit(1);
-      }
-
-      const db = openDatabase(dbPath);
-
-      try {
-        // Normalize absolute paths in file:symbol format
-        let normalizedSymbol = symbol;
-        if (symbol.includes(":") && symbol.includes("/")) {
-          const colonIdx = symbol.lastIndexOf(":");
-          const filePath = symbol.substring(0, colonIdx);
-          const symName = symbol.substring(colonIdx + 1);
-          if (filePath.startsWith(repoRoot + "/") || filePath === repoRoot) {
-            normalizedSymbol = filePath.slice(repoRoot.length + 1) + ":" + symName;
-          }
-        }
-
-        const resolved = resolveSymbol(db, normalizedSymbol);
-
-        if (!resolved) {
-          // Check if it's ambiguous (multiple matches) or not found at all
-          const matches = listSymbolsByName(db, symbol);
-          if (matches.length > 1) {
-            console.error(`Error: "${symbol}" is ambiguous. Did you mean:`);
-            for (const m of matches) {
-              console.error(`  ${m.file}:${m.name} (${m.kind})`);
-            }
-          } else {
-            console.error(`Error: Symbol "${symbol}" not found.`);
-          }
+    .option(
+      "--html [path]",
+      "Export as a standalone HTML report (default: impact-report.html)",
+    )
+    .action(
+      async (
+        symbol: string,
+        options: { json?: boolean; html?: string | boolean },
+      ) => {
+        let repoRoot: string;
+        try {
+          repoRoot = execSync("git rev-parse --show-toplevel", {
+            encoding: "utf-8",
+          }).trim();
+        } catch {
+          console.error("Error: Not inside a git repository.");
           process.exit(1);
         }
 
-        const target = `${resolved.file}:${resolved.name}`;
-        const dependents = queryDependents(db, resolved.id);
-        const enriched = enrichDependents(db, dependents, repoRoot);
-        const impactSummarizer = await createAiImpactSummarizer();
+        const dbPath = getDbPath(repoRoot);
+        if (!existsSync(dbPath)) {
+          console.error(
+            "Error: No indexed data found. Run `tracecode init` first.",
+          );
+          process.exit(1);
+        }
 
-        if (options.html) {
-          // Determine output path
-          const htmlPath = typeof options.html === "string" && options.html.length > 0
-            ? options.html
-            : "impact-report.html";
+        const db = openDatabase(dbPath);
 
-          // Get repo name from git remote if available
-          let repoName: string | undefined;
-          try {
-            const remote = execSync("git remote get-url origin", { encoding: "utf-8" }).trim();
-            const match = remote.match(/[:/]([^/]+)\/([^/.]+)(?:\.git)?$/);
-            if (match) repoName = `${match[1]}/${match[2]}`;
-          } catch {
-            // No remote configured — use directory name
+        try {
+          // Normalize absolute paths in file:symbol format
+          let normalizedSymbol = symbol;
+          if (symbol.includes(":") && symbol.includes("/")) {
+            const colonIdx = symbol.lastIndexOf(":");
+            const filePath = symbol.substring(0, colonIdx);
+            const symName = symbol.substring(colonIdx + 1);
+            if (filePath.startsWith(repoRoot + "/") || filePath === repoRoot) {
+              normalizedSymbol =
+                filePath.slice(repoRoot.length + 1) + ":" + symName;
+            }
           }
 
-          const result = await impactSummarizer.summarizeImpact(target, enriched);
-          const html = generateImpactHtml(target, dependents, {
-            repoName,
-            generatedAt: new Date().toISOString(),
-            aiSummary: result.text,
-          });
-          writeFileSync(htmlPath, html, "utf-8");
-          console.log(`HTML report written to ${htmlPath}`);
-        } else if (options.json) {
-          const result = await impactSummarizer.summarizeImpactJson(target, enriched);
-          console.log(JSON.stringify({ ...result, dependents }, null, 2));
-        } else {
-          const result = await impactSummarizer.summarizeImpact(target, enriched);
-          console.log(result.text);
+          const resolved = resolveSymbol(db, normalizedSymbol);
+
+          if (!resolved) {
+            // Check if it's ambiguous (multiple matches) or not found at all
+            const matches = listSymbolsByName(db, symbol);
+            if (matches.length > 1) {
+              console.error(`Error: "${symbol}" is ambiguous. Did you mean:`);
+              for (const m of matches) {
+                console.error(`  ${m.file}:${m.name} (${m.kind})`);
+              }
+            } else {
+              console.error(`Error: Symbol "${symbol}" not found.`);
+            }
+            process.exit(1);
+          }
+
+          const target = `${resolved.file}:${resolved.name}`;
+          const dependents = queryDependents(db, resolved.id);
+          const enriched = enrichDependents(db, dependents, repoRoot);
+          const impactSummarizer = await createAiImpactSummarizer();
+
+          if (options.html) {
+            // Determine output path
+            const htmlPath =
+              typeof options.html === "string" && options.html.length > 0
+                ? options.html
+                : "impact-report.html";
+
+            // Get repo name from git remote if available
+            let repoName: string | undefined;
+            try {
+              const remote = execSync("git remote get-url origin", {
+                encoding: "utf-8",
+              }).trim();
+              const match = remote.match(/[:/]([^/]+)\/([^/.]+)(?:\.git)?$/);
+              if (match) repoName = `${match[1]}/${match[2]}`;
+            } catch {
+              // No remote configured — use directory name
+            }
+
+            const result = await impactSummarizer.summarizeImpact(
+              target,
+              enriched,
+            );
+            const html = generateImpactHtml(target, dependents, {
+              repoName,
+              generatedAt: new Date().toISOString(),
+              aiSummary: result.text,
+            });
+            writeFileSync(htmlPath, html, "utf-8");
+            console.log(`HTML report written to ${htmlPath}`);
+          } else if (options.json) {
+            const result = await impactSummarizer.summarizeImpactJson(
+              target,
+              enriched,
+            );
+            console.log(JSON.stringify({ ...result, dependents }, null, 2));
+          } else {
+            const result = await impactSummarizer.summarizeImpact(
+              target,
+              enriched,
+            );
+            console.log(result.text);
+          }
+        } finally {
+          // Don't call db.close() — better-sqlite3 crashes during Node.js
+          // process teardown. Data is flushed via WAL; GC handles cleanup.
         }
-      } finally {
-        // Don't call db.close() — better-sqlite3 crashes during Node.js
-        // process teardown. Data is flushed via WAL; GC handles cleanup.
-      }
-    });
+      },
+    );
 }

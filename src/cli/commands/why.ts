@@ -1,12 +1,15 @@
 import type { Command } from "commander";
 import { openDatabase, getDbPath } from "../../store/db.js";
-import { queryHistoryForLocation, queryHistoryForFunction } from "../../graph/query.js";
+import {
+  queryHistoryForLocation,
+  queryHistoryForFunction,
+} from "../../graph/query.js";
 import { createAiSummarizer } from "../../summarize/ai.js";
 import { existsSync } from "node:fs";
 import { extname } from "node:path";
 import { execSync } from "node:child_process";
 
-// Build spec: docs/prism-v1-build-spec.md Section 5 (`prism why`)
+// Build spec: docs/tracecode-v1-build-spec.md Section 5 (`tracecode why`)
 //
 // Responsibilities:
 // - Resolve the target symbol/line range (file:line or --function name)
@@ -19,7 +22,9 @@ import { execSync } from "node:child_process";
  * Parses a "file:line" location string into { filePath, line }.
  * Returns null if the format is invalid.
  */
-function parseLocation(location: string): { filePath: string; line: number } | null {
+function parseLocation(
+  location: string,
+): { filePath: string; line: number } | null {
   const match = location.match(/^(.+):(\d+)$/);
   if (!match) return null;
   return { filePath: match[1], line: parseInt(match[2], 10) };
@@ -30,78 +35,92 @@ export function registerWhyCommand(program: Command): void {
     .command("why")
     .description("Explain why a piece of code exists")
     .argument("[location]", "file:line, e.g. src/foo.ts:42")
-    .option("--function <name>", "Look up by function name instead of file:line")
+    .option(
+      "--function <name>",
+      "Look up by function name instead of file:line",
+    )
     .option("--json", "Output as JSON instead of formatted text")
-    .action(async (location: string | undefined, options: { function?: string; json?: boolean }) => {
-      let repoRoot: string;
-      try {
-        repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
-      } catch {
-        console.error("Error: Not inside a git repository.");
-        process.exit(1);
-      }
-
-      const dbPath = getDbPath(repoRoot);
-      if (!existsSync(dbPath)) {
-        console.error("Error: No indexed data found. Run `prism init` first.");
-        process.exit(1);
-      }
-
-      const db = openDatabase(dbPath);
-
-      // Provider auto-detection handles template fallback internally
-      const summarizer = await createAiSummarizer();
-
-      try {
-        let history;
-        let target;
-
-        if (options.function) {
-          target = options.function;
-          history = queryHistoryForFunction(db, options.function);
-        } else if (location) {
-          const parsed = parseLocation(location);
-          if (!parsed) {
-            console.error(
-              `Error: Invalid location format "${location}". Expected file:line, e.g. src/foo.ts:42`
-            );
-            process.exit(1);
-          }
-          target = location;
-          // Strip absolute path prefix — DB stores relative paths
-          let filePath = parsed.filePath;
-          if (filePath.startsWith(repoRoot + "/") || filePath === repoRoot) {
-            filePath = filePath.slice(repoRoot.length + 1);
-          }
-          history = queryHistoryForLocation(db, filePath, parsed.line);
-        } else {
-          console.error("Error: Provide a location (file:line) or use --function <name>.");
-          program.help();
+    .action(
+      async (
+        location: string | undefined,
+        options: { function?: string; json?: boolean },
+      ) => {
+        let repoRoot: string;
+        try {
+          repoRoot = execSync("git rev-parse --show-toplevel", {
+            encoding: "utf-8",
+          }).trim();
+        } catch {
+          console.error("Error: Not inside a git repository.");
           process.exit(1);
         }
 
-        if (options.json) {
-          const json = await summarizer.summarizeJson(history, target);
-          console.log(JSON.stringify(json, null, 2));
-        } else {
-          const result = await summarizer.summarize(history, target);
-          let output = result.text;
-          // Add hint for unindexed file types
-          if (history.length === 0 && !options.function) {
-            const parsed = parseLocation(location!);
-            if (parsed) {
-              const ext = extname(parsed.filePath);
-              const tracked = [".ts", ".tsx", ".js", ".jsx"];
-              if (ext && !tracked.includes(ext)) {
-                output += `\nNote: ${ext} files are not currently indexed. Only ${tracked.join(", ")} files are tracked.`;
+        const dbPath = getDbPath(repoRoot);
+        if (!existsSync(dbPath)) {
+          console.error(
+            "Error: No indexed data found. Run `tracecode init` first.",
+          );
+          process.exit(1);
+        }
+
+        const db = openDatabase(dbPath);
+
+        // Provider auto-detection handles template fallback internally
+        const summarizer = await createAiSummarizer();
+
+        try {
+          let history;
+          let target;
+
+          if (options.function) {
+            target = options.function;
+            history = queryHistoryForFunction(db, options.function);
+          } else if (location) {
+            const parsed = parseLocation(location);
+            if (!parsed) {
+              console.error(
+                `Error: Invalid location format "${location}". Expected file:line, e.g. src/foo.ts:42`,
+              );
+              process.exit(1);
+            }
+            target = location;
+            // Strip absolute path prefix — DB stores relative paths
+            let filePath = parsed.filePath;
+            if (filePath.startsWith(repoRoot + "/") || filePath === repoRoot) {
+              filePath = filePath.slice(repoRoot.length + 1);
+            }
+            history = queryHistoryForLocation(db, filePath, parsed.line);
+          } else {
+            console.error(
+              "Error: Provide a location (file:line) or use --function <name>.",
+            );
+            program.help();
+            process.exit(1);
+          }
+
+          if (options.json) {
+            const json = await summarizer.summarizeJson(history, target);
+            console.log(JSON.stringify(json, null, 2));
+          } else {
+            const result = await summarizer.summarize(history, target);
+            let output = result.text;
+            // Add hint for unindexed file types
+            if (history.length === 0 && !options.function) {
+              const parsed = parseLocation(location!);
+              if (parsed) {
+                const ext = extname(parsed.filePath);
+                const tracked = [".ts", ".tsx", ".js", ".jsx"];
+                if (ext && !tracked.includes(ext)) {
+                  output += `\nNote: ${ext} files are not currently indexed. Only ${tracked.join(", ")} files are tracked.`;
+                }
               }
             }
+            console.log(output);
           }
-          console.log(output);
+        } finally {
+          // Don't call db.close() — better-sqlite3 crashes during Node.js
+          // process teardown. Data is flushed via WAL; GC handles cleanup.
         }
-      } finally {
-        // Don't call db.close() — better-sqlite3 crashes during Node.js
-        // process teardown. Data is flushed via WAL; GC handles cleanup.
-      }
-    });
+      },
+    );
 }

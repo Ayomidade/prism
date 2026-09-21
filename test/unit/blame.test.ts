@@ -9,7 +9,7 @@ import { join } from "node:path";
 let fixtureDir: string;
 
 beforeAll(() => {
-  fixtureDir = mkdtempSync(join(tmpdir(), "prism-blame-test-"));
+  fixtureDir = mkdtempSync(join(tmpdir(), "tracecode-blame-test-"));
   execSync("git init -q", { cwd: fixtureDir, stdio: "pipe" });
   execSync("git config user.email 'test@test.com'", { cwd: fixtureDir });
   execSync("git config user.name 'Test'", { cwd: fixtureDir });
@@ -26,7 +26,7 @@ beforeAll(() => {
       "export function add(a: number, b: number): number {",
       "  return a + b;",
       "}",
-    ].join("\n")
+    ].join("\n"),
   );
   execSync("git add -A && git commit -m 'feat: add utils'", {
     cwd: fixtureDir,
@@ -43,7 +43,7 @@ beforeAll(() => {
       "export function add(a: number, b: number): number {",
       "  return a + b;",
       "}",
-    ].join("\n")
+    ].join("\n"),
   );
   execSync("git add -A && git commit -m 'fix: update greeting'", {
     cwd: fixtureDir,

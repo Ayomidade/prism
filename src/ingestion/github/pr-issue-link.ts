@@ -3,7 +3,7 @@ import type { Octokit } from "@octokit/rest";
 // Links commit SHAs to their associated PRs/issues via the GitHub API.
 // Only called during `init` when a token is configured. Rate-limit aware,
 // caps lookups to avoid rate-limit issues on very large histories.
-// See docs/prism-v1-build-spec.md Section 7, step 7.
+// See docs/tracecode-v1-build-spec.md Section 7, step 7.
 
 export interface PrIssueLink {
   commitSha: string;
@@ -29,7 +29,7 @@ const MAX_COMMIT_LOOKUPS = 200;
  */
 export async function linkCommitsToPrsAndIssues(
   client: Octokit,
-  commitShas: string[]
+  commitShas: string[],
 ): Promise<PrIssueLink[]> {
   const results: PrIssueLink[] = [];
   const shas = commitShas.slice(0, MAX_COMMIT_LOOKUPS);
@@ -53,11 +53,12 @@ export async function linkCommitsToPrsAndIssues(
     }
 
     try {
-      const { data: prs } = await client.repos.listPullRequestsAssociatedWithCommit({
-        owner,
-        repo,
-        commit_sha: sha,
-      });
+      const { data: prs } =
+        await client.repos.listPullRequestsAssociatedWithCommit({
+          owner,
+          repo,
+          commit_sha: sha,
+        });
 
       // The endpoint returns PR objects directly
       for (const pr of prs) {
@@ -82,7 +83,7 @@ export async function linkCommitsToPrsAndIssues(
  */
 export async function fetchPrDetails(
   client: Octokit,
-  prNumbers: number[]
+  prNumbers: number[],
 ): Promise<Map<number, { title: string; body: string }>> {
   const details = new Map<number, { title: string; body: string }>();
 
@@ -116,7 +117,7 @@ export async function fetchPrDetails(
 
 /** Extracts owner from the authenticated user's repos, or uses env. */
 async function getOwner(client: Octokit): Promise<string> {
-  const envOwner = process.env.PRISM_GITHUB_OWNER;
+  const envOwner = process.env.TRACECODE_GITHUB_OWNER;
   if (envOwner) return envOwner;
 
   const { data } = await client.users.getAuthenticated();
@@ -125,13 +126,15 @@ async function getOwner(client: Octokit): Promise<string> {
 
 /** Extracts repo name from the current git remote. */
 async function getRepo(): Promise<string> {
-  const envRepo = process.env.PRISM_GITHUB_REPO;
+  const envRepo = process.env.TRACECODE_GITHUB_REPO;
   if (envRepo) return envRepo;
 
   // Try to read from git remote
   const { execSync } = await import("node:child_process");
   try {
-    const remote = execSync("git remote get-url origin", { encoding: "utf-8" }).trim();
+    const remote = execSync("git remote get-url origin", {
+      encoding: "utf-8",
+    }).trim();
     // Parse owner/repo from URL: https://github.com/owner/repo.git or git@github.com:owner/repo.git
     const match = remote.match(/[:/]([^/]+)\/([^/.]+)(?:\.git)?$/);
     if (match) return match[2];
@@ -140,7 +143,7 @@ async function getRepo(): Promise<string> {
   }
 
   throw new Error(
-    "Cannot determine repository. Set PRISM_GITHUB_REPO env var or run from a git repo with a remote."
+    "Cannot determine repository. Set TRACECODE_GITHUB_REPO env var or run from a git repo with a remote.",
   );
 }
 

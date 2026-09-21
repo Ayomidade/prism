@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .prism/
+.deepgit/
+.tracecode
 *.log
 .env
 .DS_Store

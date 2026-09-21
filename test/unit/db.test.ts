@@ -1,5 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { openDatabase, checkSchemaVersion, getDbPath } from "../../src/store/db.js";
+import {
+  openDatabase,
+  checkSchemaVersion,
+  getDbPath,
+} from "../../src/store/db.js";
 import { rmSync, existsSync } from "node:fs";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -27,7 +31,7 @@ afterEach(() => {
 });
 
 describe("openDatabase", () => {
-  it("creates the .prism directory and database file", () => {
+  it("creates the .tracecode directory and database file", () => {
     const db = openDatabase(TEST_DB);
     expect(existsSync(TEST_DB)).toBe(true);
   });
@@ -35,7 +39,9 @@ describe("openDatabase", () => {
   it("creates all required tables", () => {
     const db = openDatabase(TEST_DB);
     const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      )
       .all() as { name: string }[];
     const tableNames = tables.map((t) => t.name);
 
@@ -47,7 +53,6 @@ describe("openDatabase", () => {
     expect(tableNames).toContain("commit_files");
     expect(tableNames).toContain("pr_issue_links");
     expect(tableNames).toContain("meta");
-
   });
 
   it("stamps schema_version in meta on first run", () => {
@@ -76,12 +81,14 @@ describe("openDatabase", () => {
     const db1 = openDatabase(TEST_DB);
 
     // Tamper with the stored version to simulate an upgraded codebase
-    db1.prepare("UPDATE meta SET value = '999' WHERE key = 'schema_version'").run();
+    db1
+      .prepare("UPDATE meta SET value = '999' WHERE key = 'schema_version'")
+      .run();
 
     // Now openDatabase should throw because code expects current version, db has v999
     expect(() => openDatabase(TEST_DB)).toThrow("out of date");
     expect(() => openDatabase(TEST_DB)).toThrow("found v999");
-    expect(() => openDatabase(TEST_DB)).toThrow("prism init --refresh");
+    expect(() => openDatabase(TEST_DB)).toThrow("tracecode init --refresh");
   });
 
   it("enables WAL mode", () => {
@@ -98,7 +105,9 @@ describe("openDatabase", () => {
 });
 
 describe("getDbPath", () => {
-  it("returns <repoRoot>/.prism/graph.db", () => {
-    expect(getDbPath("/home/user/my-repo")).toBe("/home/user/my-repo/.prism/graph.db");
+  it("returns <repoRoot>/.tracecode/graph.db", () => {
+    expect(getDbPath("/home/user/my-repo")).toBe(
+      "/home/user/my-repo/.tracecode/graph.db",
+    );
   });
 });

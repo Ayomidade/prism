@@ -1,6 +1,17 @@
 import type { Command } from "commander";
 import { select, input, confirm } from "@inquirer/prompts";
-import { setProviderKey, setGitHubToken, setModel, listConfig, getProviderKey, removeProviderKey, removeGitHubToken, setActiveProvider, removeActiveProvider, getActiveProvider } from "../../config/tokens.js";
+import {
+  setProviderKey,
+  setGitHubToken,
+  setModel,
+  listConfig,
+  getProviderKey,
+  removeProviderKey,
+  removeGitHubToken,
+  setActiveProvider,
+  removeActiveProvider,
+  getActiveProvider,
+} from "../../config/tokens.js";
 import { fetchModelsForProvider } from "../../summarize/providers.js";
 import type { ProviderId } from "../../summarize/providers.js";
 
@@ -10,17 +21,22 @@ const VALID_TARGETS = [...VALID_PROVIDERS, "github"];
 export function registerConfigCommand(program: Command): void {
   const config = program
     .command("config")
-    .description("Manage PRISM configuration (API keys, tokens, models)");
+    .description("Manage TRACECODE configuration (API keys, tokens, models)");
 
   config
     .command("set-key")
-    .description("Store an API key or token locally (written to ~/.config/prism/)")
-    .argument("<target>", "Provider name (anthropic, openai, gemini, groq, custom) or 'github'")
+    .description(
+      "Store an API key or token locally (written to ~/.config/tracecode/)",
+    )
+    .argument(
+      "<target>",
+      "Provider name (anthropic, openai, gemini, groq, custom) or 'github'",
+    )
     .argument("<key>", "API key or token value")
     .action((target: string, key: string) => {
       if (!VALID_TARGETS.includes(target)) {
         console.error(
-          `Error: Unknown target "${target}". Expected one of: ${VALID_TARGETS.join(", ")}`
+          `Error: Unknown target "${target}". Expected one of: ${VALID_TARGETS.join(", ")}`,
         );
         process.exit(1);
       }
@@ -36,13 +52,21 @@ export function registerConfigCommand(program: Command): void {
 
   config
     .command("set-model")
-    .description("Set the AI model for a provider — interactive if provider/model omitted")
-    .argument("[provider]", "Provider name (anthropic, openai, gemini, groq, custom)")
-    .argument("[model]", "Model name — if omitted, pick interactively from live available models")
+    .description(
+      "Set the AI model for a provider — interactive if provider/model omitted",
+    )
+    .argument(
+      "[provider]",
+      "Provider name (anthropic, openai, gemini, groq, custom)",
+    )
+    .argument(
+      "[model]",
+      "Model name — if omitted, pick interactively from live available models",
+    )
     .action(async (provider: string | undefined, model: string | undefined) => {
       if (provider && !VALID_PROVIDERS.includes(provider)) {
         console.error(
-          `Error: Unknown provider "${provider}". Expected one of: ${VALID_PROVIDERS.join(", ")}`
+          `Error: Unknown provider "${provider}". Expected one of: ${VALID_PROVIDERS.join(", ")}`,
         );
         process.exit(1);
       }
@@ -66,12 +90,12 @@ export function registerConfigCommand(program: Command): void {
         const apiKey = getProviderKey(chosenProvider);
         if (!apiKey) {
           console.error(
-            `No key configured for "${chosenProvider}". Run: prism config set-key ${chosenProvider} <key>`
+            `No key configured for "${chosenProvider}". Run: tracecode config set-key ${chosenProvider} <key>`,
           );
           process.exit(1);
         }
 
-        const baseUrl = process.env.PRISM_AI_BASE_URL;
+        const baseUrl = process.env.TRACECODE_AI_BASE_URL;
         let chosenModel: string;
 
         try {
@@ -79,7 +103,7 @@ export function registerConfigCommand(program: Command): void {
           const models = await fetchModelsForProvider(
             chosenProvider as ProviderId,
             apiKey,
-            baseUrl
+            baseUrl,
           );
 
           if (models.length === 0) throw new Error("No models returned");
@@ -91,8 +115,10 @@ export function registerConfigCommand(program: Command): void {
         } catch (err: any) {
           // Graceful degradation — never dead-end the command over a failed
           // discovery call (network issue, provider doesn't support listing,
-          // custom provider with no PRISM_AI_BASE_URL set, etc.)
-          console.log(`Could not fetch model list (${err.message}). Enter one manually.`);
+          // custom provider with no TRACECODE_AI_BASE_URL set, etc.)
+          console.log(
+            `Could not fetch model list (${err.message}). Enter one manually.`,
+          );
           chosenModel = await input({ message: "Model name:" });
         }
 
@@ -173,7 +199,9 @@ export function registerConfigCommand(program: Command): void {
         const providersWithKeys = cfg.providers.filter((p) => p.keySet);
 
         if (providersWithKeys.length === 0) {
-          console.error("No providers configured. Run: prism config set-key <provider> <key>");
+          console.error(
+            "No providers configured. Run: tracecode config set-key <provider> <key>",
+          );
           process.exit(1);
         }
 
@@ -193,7 +221,9 @@ export function registerConfigCommand(program: Command): void {
 
         if (action === "reset") {
           removeActiveProvider();
-          console.log("Active provider preference removed. Will auto-detect from configured keys.");
+          console.log(
+            "Active provider preference removed. Will auto-detect from configured keys.",
+          );
           return;
         }
 
@@ -215,7 +245,7 @@ export function registerConfigCommand(program: Command): void {
 
         // Model selection
         const apiKey = getProviderKey(chosenProvider)!;
-        const baseUrl = process.env.PRISM_AI_BASE_URL;
+        const baseUrl = process.env.TRACECODE_AI_BASE_URL;
         let chosenModel: string;
 
         try {
@@ -223,7 +253,7 @@ export function registerConfigCommand(program: Command): void {
           const models = await fetchModelsForProvider(
             chosenProvider as ProviderId,
             apiKey,
-            baseUrl
+            baseUrl,
           );
 
           if (models.length === 0) throw new Error("No models returned");
@@ -233,7 +263,9 @@ export function registerConfigCommand(program: Command): void {
             choices: models.map((m) => ({ name: m, value: m })),
           });
         } catch (err: any) {
-          console.log(`Could not fetch model list (${err.message}). Enter one manually.`);
+          console.log(
+            `Could not fetch model list (${err.message}). Enter one manually.`,
+          );
           chosenModel = await input({ message: "Model name:" });
         }
 
@@ -258,14 +290,21 @@ export function registerConfigCommand(program: Command): void {
       const activeProvider = getActiveProvider();
 
       console.log("GitHub token:  " + (cfg.githubToken ? "set" : "not set"));
-      console.log("Active provider: " + (activeProvider ? `${activeProvider} (set by switch-provider)` : "auto-detect"));
+      console.log(
+        "Active provider: " +
+          (activeProvider
+            ? `${activeProvider} (set by switch-provider)`
+            : "auto-detect"),
+      );
       console.log("");
 
       for (const p of cfg.providers) {
         const keyStatus = p.keySet ? "set" : "not set";
         console.log(`${capitalize(p.id)} key: ${keyStatus}`);
         if (p.keySet) {
-          const modelDisplay = p.model ? `${p.model} (custom)` : `${p.id === "custom" ? "(not set)" : "(default)"}`;
+          const modelDisplay = p.model
+            ? `${p.model} (custom)`
+            : `${p.id === "custom" ? "(not set)" : "(default)"}`;
           console.log(`  Model:       ${modelDisplay}`);
         }
       }

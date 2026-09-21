@@ -2,14 +2,16 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 
 // Mock tokens.ts so tests only read from env vars, never from real files.
 // This prevents tests from being affected by (or corrupting) a developer's
-// actual ~/.config/prism/ configuration.
+// actual ~/.config/tracecode/ configuration.
 vi.mock("../../src/config/tokens.js", () => ({
-  getProviderKey: (id: string) => process.env[`PRISM_${id.toUpperCase()}_KEY`],
-  getModel: (id: string) => process.env.PRISM_AI_MODEL,
+  getProviderKey: (id: string) =>
+    process.env[`TRACECODE_${id.toUpperCase()}_KEY`],
+  getModel: (id: string) => process.env.TRACECODE_AI_MODEL,
   getActiveProvider: () => undefined,
 }));
 
-const { resolveAiProviderConfig } = await import("../../src/summarize/providers.js");
+const { resolveAiProviderConfig } =
+  await import("../../src/summarize/providers.js");
 
 // Tests for provider resolution logic — the branching logic that
 // determines which AI provider (if any) is used. This is the most
@@ -25,12 +27,12 @@ describe("resolveAiProviderConfig", () => {
   });
 
   it("returns null when no provider is configured", () => {
-    delete process.env.PRISM_AI_PROVIDER;
-    delete process.env.PRISM_ANTHROPIC_KEY;
-    delete process.env.PRISM_OPENAI_KEY;
-    delete process.env.PRISM_GEMINI_KEY;
-    delete process.env.PRISM_GROQ_KEY;
-    delete process.env.PRISM_CUSTOM_KEY;
+    delete process.env.TRACECODE_AI_PROVIDER;
+    delete process.env.TRACECODE_ANTHROPIC_KEY;
+    delete process.env.TRACECODE_OPENAI_KEY;
+    delete process.env.TRACECODE_GEMINI_KEY;
+    delete process.env.TRACECODE_GROQ_KEY;
+    delete process.env.TRACECODE_CUSTOM_KEY;
 
     expect(resolveAiProviderConfig()).toBeNull();
   });
@@ -38,8 +40,8 @@ describe("resolveAiProviderConfig", () => {
   // ── Explicit provider selection ──────────────────────────────────
 
   it("resolves explicit anthropic provider with key", () => {
-    process.env.PRISM_AI_PROVIDER = "anthropic";
-    process.env.PRISM_ANTHROPIC_KEY = "sk-ant-test";
+    process.env.TRACECODE_AI_PROVIDER = "anthropic";
+    process.env.TRACECODE_ANTHROPIC_KEY = "sk-ant-test";
 
     const config = resolveAiProviderConfig();
     expect(config).not.toBeNull();
@@ -50,25 +52,27 @@ describe("resolveAiProviderConfig", () => {
   });
 
   it("throws for explicit provider with no key", () => {
-    process.env.PRISM_AI_PROVIDER = "anthropic";
-    delete process.env.PRISM_ANTHROPIC_KEY;
+    process.env.TRACECODE_AI_PROVIDER = "anthropic";
+    delete process.env.TRACECODE_ANTHROPIC_KEY;
 
     expect(() => resolveAiProviderConfig()).toThrow("no key is configured");
     expect(() => resolveAiProviderConfig()).toThrow("anthropic");
   });
 
   it("throws for unknown provider id", () => {
-    process.env.PRISM_AI_PROVIDER = "nonexistent" as any;
+    process.env.TRACECODE_AI_PROVIDER = "nonexistent" as any;
 
-    expect(() => resolveAiProviderConfig()).toThrow("Unknown PRISM_AI_PROVIDER");
+    expect(() => resolveAiProviderConfig()).toThrow(
+      "Unknown TRACECODE_AI_PROVIDER",
+    );
     expect(() => resolveAiProviderConfig()).toThrow("nonexistent");
   });
 
   // ── OpenAI-compatible providers ──────────────────────────────────
 
   it("resolves explicit openai provider", () => {
-    process.env.PRISM_AI_PROVIDER = "openai";
-    process.env.PRISM_OPENAI_KEY = "sk-test";
+    process.env.TRACECODE_AI_PROVIDER = "openai";
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("openai");
@@ -78,17 +82,19 @@ describe("resolveAiProviderConfig", () => {
   });
 
   it("resolves explicit gemini provider", () => {
-    process.env.PRISM_AI_PROVIDER = "gemini";
-    process.env.PRISM_GEMINI_KEY = "ai-test";
+    process.env.TRACECODE_AI_PROVIDER = "gemini";
+    process.env.TRACECODE_GEMINI_KEY = "ai-test";
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("gemini");
-    expect(config!.baseUrl).toBe("https://generativelanguage.googleapis.com/v1beta");
+    expect(config!.baseUrl).toBe(
+      "https://generativelanguage.googleapis.com/v1beta",
+    );
   });
 
   it("resolves explicit groq provider", () => {
-    process.env.PRISM_AI_PROVIDER = "groq";
-    process.env.PRISM_GROQ_KEY = "gsk_test";
+    process.env.TRACECODE_AI_PROVIDER = "groq";
+    process.env.TRACECODE_GROQ_KEY = "gsk_test";
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("groq");
@@ -98,10 +104,10 @@ describe("resolveAiProviderConfig", () => {
   // ── Custom provider ──────────────────────────────────────────────
 
   it("resolves custom provider with base URL and model", () => {
-    process.env.PRISM_AI_PROVIDER = "custom";
-    process.env.PRISM_CUSTOM_KEY = "test-key";
-    process.env.PRISM_AI_BASE_URL = "https://openrouter.ai/api/v1";
-    process.env.PRISM_AI_MODEL = "xiaomi/mimo-v2.5";
+    process.env.TRACECODE_AI_PROVIDER = "custom";
+    process.env.TRACECODE_CUSTOM_KEY = "test-key";
+    process.env.TRACECODE_AI_BASE_URL = "https://openrouter.ai/api/v1";
+    process.env.TRACECODE_AI_MODEL = "xiaomi/mimo-v2.5";
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("custom");
@@ -110,68 +116,68 @@ describe("resolveAiProviderConfig", () => {
   });
 
   it("throws for custom provider without base URL", () => {
-    process.env.PRISM_AI_PROVIDER = "custom";
-    process.env.PRISM_CUSTOM_KEY = "test-key";
-    delete process.env.PRISM_AI_BASE_URL;
-    process.env.PRISM_AI_MODEL = "some-model";
+    process.env.TRACECODE_AI_PROVIDER = "custom";
+    process.env.TRACECODE_CUSTOM_KEY = "test-key";
+    delete process.env.TRACECODE_AI_BASE_URL;
+    process.env.TRACECODE_AI_MODEL = "some-model";
 
-    expect(() => resolveAiProviderConfig()).toThrow("PRISM_AI_BASE_URL");
+    expect(() => resolveAiProviderConfig()).toThrow("TRACECODE_AI_BASE_URL");
   });
 
   it("throws for custom provider without model", () => {
-    process.env.PRISM_AI_PROVIDER = "custom";
-    process.env.PRISM_CUSTOM_KEY = "test-key";
-    process.env.PRISM_AI_BASE_URL = "https://example.com/v1";
-    delete process.env.PRISM_AI_MODEL;
+    process.env.TRACECODE_AI_PROVIDER = "custom";
+    process.env.TRACECODE_CUSTOM_KEY = "test-key";
+    process.env.TRACECODE_AI_BASE_URL = "https://example.com/v1";
+    delete process.env.TRACECODE_AI_MODEL;
 
-    expect(() => resolveAiProviderConfig()).toThrow("PRISM_AI_MODEL");
+    expect(() => resolveAiProviderConfig()).toThrow("TRACECODE_AI_MODEL");
   });
 
-  // ── Auto-detection (no explicit PRISM_AI_PROVIDER) ───────────────
+  // ── Auto-detection (no explicit TRACECODE_AI_PROVIDER) ───────────────
 
   it("auto-detects anthropic when only anthropic key is set", () => {
-    delete process.env.PRISM_AI_PROVIDER;
-    process.env.PRISM_ANTHROPIC_KEY = "sk-ant-test";
-    delete process.env.PRISM_OPENAI_KEY;
-    delete process.env.PRISM_GEMINI_KEY;
-    delete process.env.PRISM_GROQ_KEY;
-    delete process.env.PRISM_CUSTOM_KEY;
+    delete process.env.TRACECODE_AI_PROVIDER;
+    process.env.TRACECODE_ANTHROPIC_KEY = "sk-ant-test";
+    delete process.env.TRACECODE_OPENAI_KEY;
+    delete process.env.TRACECODE_GEMINI_KEY;
+    delete process.env.TRACECODE_GROQ_KEY;
+    delete process.env.TRACECODE_CUSTOM_KEY;
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("anthropic");
   });
 
   it("auto-detects openai when only openai key is set", () => {
-    delete process.env.PRISM_AI_PROVIDER;
-    delete process.env.PRISM_ANTHROPIC_KEY;
-    process.env.PRISM_OPENAI_KEY = "sk-test";
-    delete process.env.PRISM_GEMINI_KEY;
-    delete process.env.PRISM_GROQ_KEY;
-    delete process.env.PRISM_CUSTOM_KEY;
+    delete process.env.TRACECODE_AI_PROVIDER;
+    delete process.env.TRACECODE_ANTHROPIC_KEY;
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
+    delete process.env.TRACECODE_GEMINI_KEY;
+    delete process.env.TRACECODE_GROQ_KEY;
+    delete process.env.TRACECODE_CUSTOM_KEY;
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("openai");
   });
 
   it("picks anthropic over openai when both keys are set", () => {
-    delete process.env.PRISM_AI_PROVIDER;
-    process.env.PRISM_ANTHROPIC_KEY = "sk-ant-test";
-    process.env.PRISM_OPENAI_KEY = "sk-test";
-    delete process.env.PRISM_GEMINI_KEY;
-    delete process.env.PRISM_GROQ_KEY;
-    delete process.env.PRISM_CUSTOM_KEY;
+    delete process.env.TRACECODE_AI_PROVIDER;
+    process.env.TRACECODE_ANTHROPIC_KEY = "sk-ant-test";
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
+    delete process.env.TRACECODE_GEMINI_KEY;
+    delete process.env.TRACECODE_GROQ_KEY;
+    delete process.env.TRACECODE_CUSTOM_KEY;
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("anthropic");
   });
 
   it("picks openai over gemini when both keys are set", () => {
-    delete process.env.PRISM_AI_PROVIDER;
-    delete process.env.PRISM_ANTHROPIC_KEY;
-    process.env.PRISM_OPENAI_KEY = "sk-test";
-    process.env.PRISM_GEMINI_KEY = "ai-test";
-    delete process.env.PRISM_GROQ_KEY;
-    delete process.env.PRISM_CUSTOM_KEY;
+    delete process.env.TRACECODE_AI_PROVIDER;
+    delete process.env.TRACECODE_ANTHROPIC_KEY;
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
+    process.env.TRACECODE_GEMINI_KEY = "ai-test";
+    delete process.env.TRACECODE_GROQ_KEY;
+    delete process.env.TRACECODE_CUSTOM_KEY;
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("openai");
@@ -179,19 +185,19 @@ describe("resolveAiProviderConfig", () => {
 
   // ── Model override ───────────────────────────────────────────────
 
-  it("uses PRISM_AI_MODEL to override default model", () => {
-    process.env.PRISM_AI_PROVIDER = "openai";
-    process.env.PRISM_OPENAI_KEY = "sk-test";
-    process.env.PRISM_AI_MODEL = "gpt-4o";
+  it("uses TRACECODE_AI_MODEL to override default model", () => {
+    process.env.TRACECODE_AI_PROVIDER = "openai";
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
+    process.env.TRACECODE_AI_MODEL = "gpt-4o";
 
     const config = resolveAiProviderConfig();
     expect(config!.model).toBe("gpt-4o");
   });
 
-  it("uses default model when PRISM_AI_MODEL is not set", () => {
-    process.env.PRISM_AI_PROVIDER = "openai";
-    process.env.PRISM_OPENAI_KEY = "sk-test";
-    delete process.env.PRISM_AI_MODEL;
+  it("uses default model when TRACECODE_AI_MODEL is not set", () => {
+    process.env.TRACECODE_AI_PROVIDER = "openai";
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
+    delete process.env.TRACECODE_AI_MODEL;
 
     const config = resolveAiProviderConfig();
     expect(config!.model).toBe("gpt-4o-mini");
@@ -199,21 +205,21 @@ describe("resolveAiProviderConfig", () => {
 
   // ── Base URL override for custom ─────────────────────────────────
 
-  it("custom provider uses PRISM_AI_BASE_URL", () => {
-    process.env.PRISM_AI_PROVIDER = "custom";
-    process.env.PRISM_CUSTOM_KEY = "test-key";
-    process.env.PRISM_AI_BASE_URL = "http://localhost:11434/v1";
-    process.env.PRISM_AI_MODEL = "llama3";
+  it("custom provider uses TRACECODE_AI_BASE_URL", () => {
+    process.env.TRACECODE_AI_PROVIDER = "custom";
+    process.env.TRACECODE_CUSTOM_KEY = "test-key";
+    process.env.TRACECODE_AI_BASE_URL = "http://localhost:11434/v1";
+    process.env.TRACECODE_AI_MODEL = "llama3";
 
     const config = resolveAiProviderConfig();
     expect(config!.baseUrl).toBe("http://localhost:11434/v1");
     expect(config!.model).toBe("llama3");
   });
 
-  it("non-custom provider ignores PRISM_AI_BASE_URL", () => {
-    process.env.PRISM_AI_PROVIDER = "openai";
-    process.env.PRISM_OPENAI_KEY = "sk-test";
-    process.env.PRISM_AI_BASE_URL = "http://localhost:11434/v1";
+  it("non-custom provider ignores TRACECODE_AI_BASE_URL", () => {
+    process.env.TRACECODE_AI_PROVIDER = "openai";
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
+    process.env.TRACECODE_AI_BASE_URL = "http://localhost:11434/v1";
 
     const config = resolveAiProviderConfig();
     expect(config!.baseUrl).toBe("https://api.openai.com/v1");
@@ -221,9 +227,9 @@ describe("resolveAiProviderConfig", () => {
 
   // ── Env var key lookup ───────────────────────────────────────────
 
-  it("reads key from PRISM_<PROVIDER>_KEY env var", () => {
-    process.env.PRISM_AI_PROVIDER = "groq";
-    process.env.PRISM_GROQ_KEY = "gsk_abc123";
+  it("reads key from TRACECODE_<PROVIDER>_KEY env var", () => {
+    process.env.TRACECODE_AI_PROVIDER = "groq";
+    process.env.TRACECODE_GROQ_KEY = "gsk_abc123";
 
     const config = resolveAiProviderConfig();
     expect(config!.apiKey).toBe("gsk_abc123");
@@ -234,22 +240,22 @@ describe("resolveAiProviderConfig", () => {
   it("skips misconfigured custom provider during auto-detect", () => {
     // Stale custom key file but no base URL/model — should not crash,
     // should fall through to null (template fallback).
-    delete process.env.PRISM_AI_PROVIDER;
-    delete process.env.PRISM_ANTHROPIC_KEY;
-    delete process.env.PRISM_OPENAI_KEY;
-    delete process.env.PRISM_GEMINI_KEY;
-    delete process.env.PRISM_GROQ_KEY;
-    process.env.PRISM_CUSTOM_KEY = "stale-key";
+    delete process.env.TRACECODE_AI_PROVIDER;
+    delete process.env.TRACECODE_ANTHROPIC_KEY;
+    delete process.env.TRACECODE_OPENAI_KEY;
+    delete process.env.TRACECODE_GEMINI_KEY;
+    delete process.env.TRACECODE_GROQ_KEY;
+    process.env.TRACECODE_CUSTOM_KEY = "stale-key";
 
     const config = resolveAiProviderConfig();
     expect(config).toBeNull();
   });
 
   it("picks openai over misconfigured custom during auto-detect", () => {
-    delete process.env.PRISM_AI_PROVIDER;
-    delete process.env.PRISM_ANTHROPIC_KEY;
-    process.env.PRISM_OPENAI_KEY = "sk-test";
-    process.env.PRISM_CUSTOM_KEY = "stale-key";
+    delete process.env.TRACECODE_AI_PROVIDER;
+    delete process.env.TRACECODE_ANTHROPIC_KEY;
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
+    process.env.TRACECODE_CUSTOM_KEY = "stale-key";
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("openai");
@@ -258,27 +264,27 @@ describe("resolveAiProviderConfig", () => {
   // ── Model resolution ────────────────────────────────────────────
 
   it("uses provider defaultModel when no model override is set", () => {
-    process.env.PRISM_AI_PROVIDER = "openai";
-    process.env.PRISM_OPENAI_KEY = "sk-test";
-    delete process.env.PRISM_AI_MODEL;
+    process.env.TRACECODE_AI_PROVIDER = "openai";
+    process.env.TRACECODE_OPENAI_KEY = "sk-test";
+    delete process.env.TRACECODE_AI_MODEL;
 
     const config = resolveAiProviderConfig();
     expect(config!.model).toBe("gpt-4o-mini");
   });
 
-  it("PRISM_AI_MODEL env var overrides default for any provider", () => {
-    process.env.PRISM_AI_PROVIDER = "groq";
-    process.env.PRISM_GROQ_KEY = "gsk_test";
-    process.env.PRISM_AI_MODEL = "llama-3.1-8b-instant";
+  it("TRACECODE_AI_MODEL env var overrides default for any provider", () => {
+    process.env.TRACECODE_AI_PROVIDER = "groq";
+    process.env.TRACECODE_GROQ_KEY = "gsk_test";
+    process.env.TRACECODE_AI_MODEL = "llama-3.1-8b-instant";
 
     const config = resolveAiProviderConfig();
     expect(config!.model).toBe("llama-3.1-8b-instant");
   });
 
-  it("PRISM_AI_MODEL applies globally to whichever provider is detected", () => {
-    delete process.env.PRISM_AI_PROVIDER;
-    process.env.PRISM_ANTHROPIC_KEY = "sk-ant-test";
-    process.env.PRISM_AI_MODEL = "claude-3-haiku-20240307";
+  it("TRACECODE_AI_MODEL applies globally to whichever provider is detected", () => {
+    delete process.env.TRACECODE_AI_PROVIDER;
+    process.env.TRACECODE_ANTHROPIC_KEY = "sk-ant-test";
+    process.env.TRACECODE_AI_MODEL = "claude-3-haiku-20240307";
 
     const config = resolveAiProviderConfig();
     expect(config!.provider.id).toBe("anthropic");
@@ -288,7 +294,8 @@ describe("resolveAiProviderConfig", () => {
 
 // ── fetchModelsForProvider ─────────────────────────────────────────
 
-const { fetchModelsForProvider } = await import("../../src/summarize/providers.js");
+const { fetchModelsForProvider } =
+  await import("../../src/summarize/providers.js");
 
 describe("fetchModelsForProvider", () => {
   const originalFetch = global.fetch;
@@ -300,15 +307,23 @@ describe("fetchModelsForProvider", () => {
   it("fetches models for anthropic provider", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ data: [{ id: "claude-sonnet-4" }, { id: "claude-3-haiku" }] }),
+      json: async () => ({
+        data: [{ id: "claude-sonnet-4" }, { id: "claude-3-haiku" }],
+      }),
     });
 
     const models = await fetchModelsForProvider("anthropic", "sk-ant-test");
     expect(models).toEqual(["claude-sonnet-4", "claude-3-haiku"]);
 
-    expect(global.fetch).toHaveBeenCalledWith("https://api.anthropic.com/v1/models", {
-      headers: { "x-api-key": "sk-ant-test", "anthropic-version": "2023-06-01" },
-    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.anthropic.com/v1/models",
+      {
+        headers: {
+          "x-api-key": "sk-ant-test",
+          "anthropic-version": "2023-06-01",
+        },
+      },
+    );
   });
 
   it("fetches models for openai provider (sorted)", async () => {
@@ -320,9 +335,12 @@ describe("fetchModelsForProvider", () => {
     const models = await fetchModelsForProvider("openai", "sk-test", undefined);
     expect(models).toEqual(["gpt-4o", "gpt-4o-mini"]);
 
-    expect(global.fetch).toHaveBeenCalledWith("https://api.openai.com/v1/models", {
-      headers: { Authorization: "Bearer sk-test" },
-    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/models",
+      {
+        headers: { Authorization: "Bearer sk-test" },
+      },
+    );
   });
 
   it("fetches models for groq provider", async () => {
@@ -334,9 +352,12 @@ describe("fetchModelsForProvider", () => {
     const models = await fetchModelsForProvider("groq", "gsk_test");
     expect(models).toEqual(["llama-3.3-70b-versatile"]);
 
-    expect(global.fetch).toHaveBeenCalledWith("https://api.groq.com/openai/v1/models", {
-      headers: { Authorization: "Bearer gsk_test" },
-    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.groq.com/openai/v1/models",
+      {
+        headers: { Authorization: "Bearer gsk_test" },
+      },
+    );
   });
 
   it("fetches models for gemini provider with x-goog-api-key header", async () => {
@@ -355,7 +376,7 @@ describe("fetchModelsForProvider", () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       "https://generativelanguage.googleapis.com/v1beta/models",
-      { headers: { "x-goog-api-key": "test-gemini-key" } }
+      { headers: { "x-goog-api-key": "test-gemini-key" } },
     );
   });
 
@@ -365,18 +386,25 @@ describe("fetchModelsForProvider", () => {
       json: async () => ({ data: [{ id: "local-model" }] }),
     });
 
-    const models = await fetchModelsForProvider("custom", "test-key", "http://localhost:11434/v1");
+    const models = await fetchModelsForProvider(
+      "custom",
+      "test-key",
+      "http://localhost:11434/v1",
+    );
     expect(models).toEqual(["local-model"]);
 
-    expect(global.fetch).toHaveBeenCalledWith("http://localhost:11434/v1/models", {
-      headers: { Authorization: "Bearer test-key" },
-    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://localhost:11434/v1/models",
+      {
+        headers: { Authorization: "Bearer test-key" },
+      },
+    );
   });
 
   it("throws for custom provider without base URL", async () => {
-    await expect(fetchModelsForProvider("custom", "test-key", undefined)).rejects.toThrow(
-      "No base URL available"
-    );
+    await expect(
+      fetchModelsForProvider("custom", "test-key", undefined),
+    ).rejects.toThrow("No base URL available");
   });
 
   it("throws when API returns non-ok status", async () => {
@@ -386,7 +414,7 @@ describe("fetchModelsForProvider", () => {
     });
 
     await expect(fetchModelsForProvider("openai", "bad-key")).rejects.toThrow(
-      "Failed to list models (401)"
+      "Failed to list models (401)",
     );
   });
 

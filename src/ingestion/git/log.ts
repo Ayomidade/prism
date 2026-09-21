@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 
 // Parses `git log --all --numstat --format=...` into structured commit data.
-// See docs/prism-v1-build-spec.md Section 7, step 2.
+// See docs/tracecode-v1-build-spec.md Section 7, step 2.
 
 // Control characters as separators — cannot appear in normal commit text,
 // so there is zero collision risk with commit messages.
@@ -49,15 +49,12 @@ export async function parseGitLog(repoRoot: string): Promise<ParsedCommit[]> {
 
   let raw: string;
   try {
-    raw = execSync(
-      `git log --all --numstat --format="${format}"`,
-      {
-        cwd: repoRoot,
-        encoding: "utf-8",
-        maxBuffer: 100 * 1024 * 1024, // 100MB
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    );
+    raw = execSync(`git log --all --numstat --format="${format}"`, {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      maxBuffer: 100 * 1024 * 1024, // 100MB
+      stdio: ["pipe", "pipe", "pipe"],
+    });
   } catch {
     // git log fails if not inside a repo, or if the repo has zero commits.
     // Both are valid "nothing to index" states.

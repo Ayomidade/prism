@@ -1,19 +1,19 @@
-# PRISM Usage Guide
+# TRACECODE Usage Guide
 
-PRISM is a local-first CLI that indexes your git history and code structure so you can understand why code exists and what a change will break.
+TRACECODE is a local-first CLI that indexes your git history and code structure so you can understand why code exists and what a change will break.
 
 ---
 
 ## Install
 
 ```bash
-npm install -g prism-cli
+npm install -g tracecode
 ```
 
 Or run without installing:
 
 ```bash
-npx prism-cli <command>
+npx tracecode <command>
 ```
 
 ---
@@ -23,26 +23,26 @@ npx prism-cli <command>
 ```bash
 # 1. Index your repo
 cd my-project
-prism init
+tracecode init
 
 # 2. Ask why code exists
-prism why src/db.ts:42
+tracecode why src/db.ts:42
 
 # 3. See what would break
-prism impact openDatabase
+tracecode impact openDatabase
 ```
 
 ---
 
 ## Commands
 
-### `prism init`
+### `tracecode init`
 
-Indexes the current repository. Builds a local SQLite graph in `.prism/graph.db` from git history (log + blame) and AST parsing (imports, exports, functions, classes, call relationships).
+Indexes the current repository. Builds a local SQLite graph in `.tracecode/graph.db` from git history (log + blame) and AST parsing (imports, exports, functions, classes, call relationships).
 
 ```bash
-prism init
-prism init --refresh    # wipe existing index and rebuild from scratch
+tracecode init
+tracecode init --refresh    # wipe existing index and rebuild from scratch
 ```
 
 **What it does:**
@@ -54,60 +54,60 @@ prism init --refresh    # wipe existing index and rebuild from scratch
 5. Optionally fetches GitHub PR/issue data (if a token is configured)
 
 **Requires:** Inside a git repository.  
-**Output:** `.prism/graph.db` (local, never leaves your machine).
+**Output:** `.tracecode/graph.db` (local, never leaves your machine).
 
 ---
 
-### `prism why <file>:<line>`
+### `tracecode why <file>:<line>`
 
 Explains why a piece of code exists by looking up its commit history and summarizing the context.
 
 ```bash
-prism why src/db.ts:42           # by file and line number
-prism why --function openDatabase # by function name
-prism why src/db.ts:42 --json     # JSON output
+tracecode why src/db.ts:42           # by file and line number
+tracecode why --function openDatabase # by function name
+tracecode why src/db.ts:42 --json     # JSON output
 ```
 
 **Arguments:**
 
-| Argument | Description |
-|----------|-------------|
+| Argument     | Description                              |
+| ------------ | ---------------------------------------- |
 | `[location]` | `file:line` format, e.g. `src/foo.ts:42` |
 
 **Options:**
 
-| Flag | Description |
-|------|-------------|
+| Flag                | Description                                   |
+| ------------------- | --------------------------------------------- |
 | `--function <name>` | Look up by function name instead of file:line |
-| `--json` | Output as JSON |
+| `--json`            | Output as JSON                                |
 
 **Output includes:** commit history, authors, PR/issue links (if configured), and an AI-generated or template-based summary explaining the purpose of the code.
 
 ---
 
-### `prism impact <symbol>`
+### `tracecode impact <symbol>`
 
 Shows what could break if you change a symbol. Traverses the reverse dependency graph to find direct and transitive dependents.
 
 ```bash
-prism impact openDatabase                  # by symbol name
-prism impact src/db.ts:openDatabase        # disambiguate with file prefix
-prism impact openDatabase --json           # JSON output
-prism impact openDatabase --html           # HTML report (writes impact-report.html)
-prism impact openDatabase --html report.html  # HTML report to custom path
+tracecode impact openDatabase                  # by symbol name
+tracecode impact src/db.ts:openDatabase        # disambiguate with file prefix
+tracecode impact openDatabase --json           # JSON output
+tracecode impact openDatabase --html           # HTML report (writes impact-report.html)
+tracecode impact openDatabase --html report.html  # HTML report to custom path
 ```
 
 **Arguments:**
 
-| Argument | Description |
-|----------|-------------|
+| Argument   | Description                                                                               |
+| ---------- | ----------------------------------------------------------------------------------------- |
 | `<symbol>` | Symbol name, or `file:symbol` to disambiguate when the same name exists in multiple files |
 
 **Options:**
 
-| Flag | Description |
-|------|-------------|
-| `--json` | Output as JSON |
+| Flag            | Description                                                            |
+| --------------- | ---------------------------------------------------------------------- |
+| `--json`        | Output as JSON                                                         |
 | `--html [path]` | Export as a standalone HTML report. Default path: `impact-report.html` |
 
 **Terminal output example:**
@@ -135,46 +135,46 @@ src/ingestion/graph-load.ts
 
 ## Configuring AI Summarization
 
-PRISM supports multiple AI providers for richer `why` summaries. If no AI key is configured, it falls back to a template-based summarizer (no key needed).
+TRACECODE supports multiple AI providers for richer `why` summaries. If no AI key is configured, it falls back to a template-based summarizer (no key needed).
 
 ### Supported Providers
 
-| Provider | Key Env Var | Default Model | Recommended Models |
-|----------|-------------|---------------|-------------------|
-| Anthropic | `PRISM_ANTHROPIC_KEY` | `claude-sonnet-4-20250514` | `claude-sonnet-4-20250514`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229` |
-| OpenAI | `PRISM_OPENAI_KEY` | `gpt-4o-mini` | `gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo` |
-| Google Gemini | `PRISM_GEMINI_KEY` | `gemini-3.6-flash` | `gemini-3.6-flash`, `gemini-2.5-pro`, `gemini-2.0-flash` |
-| Groq | `PRISM_GROQ_KEY` | `llama-3.3-70b-versatile` | `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768` |
-| Custom | `PRISM_CUSTOM_KEY` | (must set model) | Any model your endpoint supports |
+| Provider      | Key Env Var               | Default Model              | Recommended Models                                                                |
+| ------------- | ------------------------- | -------------------------- | --------------------------------------------------------------------------------- |
+| Anthropic     | `TRACECODE_ANTHROPIC_KEY` | `claude-sonnet-4-20250514` | `claude-sonnet-4-20250514`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229` |
+| OpenAI        | `TRACECODE_OPENAI_KEY`    | `gpt-4o-mini`              | `gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo`                                            |
+| Google Gemini | `TRACECODE_GEMINI_KEY`    | `gemini-3.6-flash`         | `gemini-3.6-flash`, `gemini-2.5-pro`, `gemini-2.0-flash`                          |
+| Groq          | `TRACECODE_GROQ_KEY`      | `llama-3.3-70b-versatile`  | `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`           |
+| Custom        | `TRACECODE_CUSTOM_KEY`    | (must set model)           | Any model your endpoint supports                                                  |
 
-Use `prism config set-model <provider> <model>` to override the default for any provider.
+Use `tracecode config set-model <provider> <model>` to override the default for any provider.
 
 ### Setting an API Key
 
 Set via environment variable (temporary):
 
 ```bash
-export PRISM_ANTHROPIC_KEY="sk-ant-..."
-prism why src/db.ts:42
+export TRACECODE_ANTHROPIC_KEY="sk-ant-..."
+tracecode why src/db.ts:42
 ```
 
-Or store permanently with the config command (written to `~/.config/prism/<provider>-key` with mode `0600`):
+Or store permanently with the config command (written to `~/.config/tracecode/<provider>-key` with mode `0600`):
 
 ```bash
-prism config set-key anthropic sk-ant-...
-prism config set-key openai sk-...
-prism config set-key github ghp_...
+tracecode config set-key anthropic sk-ant-...
+tracecode config set-key openai sk-...
+tracecode config set-key github ghp_...
 ```
 
-To check what's stored, look in `~/.config/prism/`. To remove a key, delete the file:
+To check what's stored, look in `~/.config/tracecode/`. To remove a key, delete the file:
 
 ```bash
-rm ~/.config/prism/anthropic-key
+rm ~/.config/tracecode/anthropic-key
 ```
 
 ### Selecting a Provider
 
-PRISM auto-detects which provider to use based on which keys are configured, in this order:
+TRACECODE auto-detects which provider to use based on which keys are configured, in this order:
 
 1. Anthropic
 2. OpenAI
@@ -182,21 +182,21 @@ PRISM auto-detects which provider to use based on which keys are configured, in 
 4. Groq
 5. Custom
 
-To force a specific provider, set `PRISM_AI_PROVIDER`:
+To force a specific provider, set `TRACECODE_AI_PROVIDER`:
 
 ```bash
-export PRISM_AI_PROVIDER=openai
-export PRISM_OPENAI_KEY="sk-..."
-prism why src/db.ts:42
+export TRACECODE_AI_PROVIDER=openai
+export TRACECODE_OPENAI_KEY="sk-..."
+tracecode why src/db.ts:42
 ```
 
-If you set `PRISM_AI_PROVIDER` but haven't configured that provider's key, PRISM will error with an actionable message.
+If you set `TRACECODE_AI_PROVIDER` but haven't configured that provider's key, TRACECODE will error with an actionable message.
 
 ### Overriding the Model
 
 ```bash
-export PRISM_AI_MODEL="gpt-4o"
-prism why src/db.ts:42
+export TRACECODE_AI_MODEL="gpt-4o"
+tracecode why src/db.ts:42
 ```
 
 ### Using a Custom Endpoint
@@ -204,32 +204,32 @@ prism why src/db.ts:42
 For OpenRouter, Ollama, or any OpenAI-compatible API:
 
 ```bash
-export PRISM_AI_PROVIDER=custom
-export PRISM_CUSTOM_KEY="your-api-key"
-export PRISM_AI_BASE_URL="https://openrouter.ai/api/v1"
-export PRISM_AI_MODEL="meta-llama/llama-3.1-8b-instruct"
-prism why src/db.ts:42
+export TRACECODE_AI_PROVIDER=custom
+export TRACECODE_CUSTOM_KEY="your-api-key"
+export TRACECODE_AI_BASE_URL="https://openrouter.ai/api/v1"
+export TRACECODE_AI_MODEL="meta-llama/llama-3.1-8b-instruct"
+tracecode why src/db.ts:42
 ```
 
 ---
 
 ## Configuring GitHub Enrichment
 
-When a GitHub token is provided, `prism init` fetches linked PR and issue data for your commit history. This enriches `why` output with PR numbers and titles.
+When a GitHub token is provided, `tracecode init` fetches linked PR and issue data for your commit history. This enriches `why` output with PR numbers and titles.
 
 ### Setting a GitHub Token
 
 Set via environment variable:
 
 ```bash
-export PRISM_GITHUB_TOKEN="ghp_..."
-prism init
+export TRACECODE_GITHUB_TOKEN="ghp_..."
+tracecode init
 ```
 
 Or store permanently with the config command:
 
 ```bash
-prism config set-key github ghp_...
+tracecode config set-key github ghp_...
 ```
 
 **Required scope:** `repo` (read-only access to pull requests).
@@ -239,9 +239,9 @@ prism config set-key github ghp_...
 If your git remote doesn't match your GitHub repo, or you're working with a fork:
 
 ```bash
-export PRISM_GITHUB_OWNER="acme-corp"
-export PRISM_GITHUB_REPO="my-app"
-prism init
+export TRACECODE_GITHUB_OWNER="acme-corp"
+export TRACECODE_GITHUB_REPO="my-app"
+tracecode init
 ```
 
 ---
@@ -257,8 +257,8 @@ Human-readable, color-free text. `why` prints a summary with commit history. `im
 Machine-readable JSON. Useful for piping into other tools or building custom workflows.
 
 ```bash
-prism why src/db.ts:42 --json | jq '.confidence'
-prism impact openDatabase --json | jq '.dependents | length'
+tracecode why src/db.ts:42 --json | jq '.confidence'
+tracecode impact openDatabase --json | jq '.dependents | length'
 ```
 
 **Why JSON shape:**
@@ -303,41 +303,41 @@ prism impact openDatabase --json | jq '.dependents | length'
 Generates a self-contained responsive HTML report with no external dependencies. Open it in any browser.
 
 ```bash
-prism impact openDatabase --html                # writes impact-report.html
-prism impact openDatabase --html my-report.html # custom path
+tracecode impact openDatabase --html                # writes impact-report.html
+tracecode impact openDatabase --html my-report.html # custom path
 ```
 
 ---
 
 ## Environment Variables Reference
 
-| Variable | Purpose |
-|----------|---------|
-| `PRISM_GITHUB_TOKEN` | GitHub personal access token (read-only `repo` scope) |
-| `PRISM_GITHUB_OWNER` | Override GitHub owner for API calls |
-| `PRISM_GITHUB_REPO` | Override GitHub repo name for API calls |
-| `PRISM_AI_PROVIDER` | Force AI provider: `anthropic`, `openai`, `gemini`, `groq`, `custom` |
-| `PRISM_ANTHROPIC_KEY` | Anthropic API key |
-| `PRISM_OPENAI_KEY` | OpenAI API key |
-| `PRISM_GEMINI_KEY` | Google Gemini API key |
-| `PRISM_GROQ_KEY` | Groq API key |
-| `PRISM_CUSTOM_KEY` | Custom provider API key |
-| `PRISM_AI_MODEL` | Override model for any provider |
-| `PRISM_AI_BASE_URL` | Base URL for custom provider |
+| Variable                  | Purpose                                                              |
+| ------------------------- | -------------------------------------------------------------------- |
+| `TRACECODE_GITHUB_TOKEN`  | GitHub personal access token (read-only `repo` scope)                |
+| `TRACECODE_GITHUB_OWNER`  | Override GitHub owner for API calls                                  |
+| `TRACECODE_GITHUB_REPO`   | Override GitHub repo name for API calls                              |
+| `TRACECODE_AI_PROVIDER`   | Force AI provider: `anthropic`, `openai`, `gemini`, `groq`, `custom` |
+| `TRACECODE_ANTHROPIC_KEY` | Anthropic API key                                                    |
+| `TRACECODE_OPENAI_KEY`    | OpenAI API key                                                       |
+| `TRACECODE_GEMINI_KEY`    | Google Gemini API key                                                |
+| `TRACECODE_GROQ_KEY`      | Groq API key                                                         |
+| `TRACECODE_CUSTOM_KEY`    | Custom provider API key                                              |
+| `TRACECODE_AI_MODEL`      | Override model for any provider                                      |
+| `TRACECODE_AI_BASE_URL`   | Base URL for custom provider                                         |
 
 ---
 
 ## How It Works
 
-PRISM stores everything locally in `.prism/graph.db`. Nothing leaves your machine unless you configure an AI provider or GitHub token.
+TRACECODE stores everything locally in `.tracecode/graph.db`. Nothing leaves your machine unless you configure an AI provider or GitHub token.
 
 ```
-prism init
+tracecode init
   |
   v
 git log + git blame  ──>  SQLite DB  <──  AST parser (ts-morph)
                              |
-    .prism/graph.db          |
+    .tracecode/graph.db          |
   ┌──────────────────────────┤
   │ files                    │
   │ symbols                  │
@@ -349,7 +349,7 @@ git log + git blame  ──>  SQLite DB  <──  AST parser (ts-morph)
                              |
               ┌──────────────┴──────────────┐
               v                             v
-        prism why                    prism impact
+        tracecode why                    tracecode impact
    (history + summary)          (dependency traversal)
 ```
 
@@ -358,10 +358,10 @@ git log + git blame  ──>  SQLite DB  <──  AST parser (ts-morph)
 ## Troubleshooting
 
 **"Not inside a git repository."**  
-Run `prism init` from inside a git repo.
+Run `tracecode init` from inside a git repo.
 
-**"No indexed data found. Run `prism init` first."**  
-The `.prism/graph.db` file doesn't exist. Run `prism init` in the repo.
+**"No indexed data found. Run `tracecode init` first."**  
+The `.tracecode/graph.db` file doesn't exist. Run `tracecode init` in the repo.
 
 **"Error: Invalid location format"**  
 Use `file:line` format, e.g. `src/foo.ts:42`.
@@ -370,13 +370,13 @@ Use `file:line` format, e.g. `src/foo.ts:42`.
 The same symbol name exists in multiple files. Use `file:symbol` format, e.g. `src/db.ts:openDatabase`.
 
 **Shallow clone warning**  
-PRISM works with shallow clones but history will be incomplete. Run `git fetch --unshallow` for full history.
+TRACECODE works with shallow clones but history will be incomplete. Run `git fetch --unshallow` for full history.
 
 **AI summarization falls back to template**  
 No AI key is configured. Set one of the provider keys (see [Configuring AI Summarization](#configuring-ai-summarization)).
 
 **`impact` shows "No dependents" for a symbol that's clearly used**  
-PRISM's call graph only tracks function/method *calls* (`foo()`), not value references (`foo` used as a variable, passed as an argument, or used in a template literal). If a symbol is referenced as a value rather than called, `impact` won't see it. This is a v1 scope cut — full type-checker resolution is out of scope.
+TRACECODE's call graph only tracks function/method _calls_ (`foo()`), not value references (`foo` used as a variable, passed as an argument, or used in a template literal). If a symbol is referenced as a value rather than called, `impact` won't see it. This is a v1 scope cut — full type-checker resolution is out of scope.
 
 **`db.close()` crash**  
-PRISM removed all `db.close()` calls to avoid a known better-sqlite3 crash during Node.js process teardown. If you see this error, update to the latest version.
+TRACECODE removed all `db.close()` calls to avoid a known better-sqlite3 crash during Node.js process teardown. If you see this error, update to the latest version.

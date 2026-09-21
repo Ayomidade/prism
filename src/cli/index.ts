@@ -6,12 +6,12 @@ import { registerWhyCommand } from "./commands/why.js";
 import { registerImpactCommand } from "./commands/impact.js";
 import { registerConfigCommand } from "./commands/config.js";
 
-// See docs/prism-v1-build-spec.md Section 5 for the exact command contract.
+// See docs/tracecode-v1-build-spec.md Section 5 for the exact command contract.
 
 const program = new Command();
 
 program
-  .name("prism")
+  .name("tracecode")
   .description("Understand your codebase before you change it.")
   .version(VERSION);
 

@@ -1,12 +1,22 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, mkdirSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  rmSync,
+  mkdtempSync,
+  mkdirSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const CLI = "src/cli/index.ts";
 
-function run(homeDir: string, ...args: string[]): { stdout: string; exitCode: number } {
+function run(
+  homeDir: string,
+  ...args: string[]
+): { stdout: string; exitCode: number } {
   try {
     const stdout = execFileSync("npx", ["tsx", CLI, ...args], {
       encoding: "utf-8",
@@ -19,7 +29,7 @@ function run(homeDir: string, ...args: string[]): { stdout: string; exitCode: nu
   }
 }
 
-describe("prism config set-key", () => {
+describe("tracecode config set-key", () => {
   let fakeHome: string;
 
   afterEach(() => {
@@ -29,33 +39,49 @@ describe("prism config set-key", () => {
   });
 
   it("stores an anthropic key", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
-    const configDir = join(fakeHome, ".config", "prism");
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
+    const configDir = join(fakeHome, ".config", "tracecode");
 
-    const { stdout, exitCode } = run(fakeHome, "config", "set-key", "anthropic", "sk-ant-test123");
+    const { stdout, exitCode } = run(
+      fakeHome,
+      "config",
+      "set-key",
+      "anthropic",
+      "sk-ant-test123",
+    );
     expect(exitCode).toBe(0);
     expect(stdout).toContain("anthropic key stored");
-    expect(readFileSync(join(configDir, "anthropic-key"), "utf-8").trim()).toBe("sk-ant-test123");
+    expect(readFileSync(join(configDir, "anthropic-key"), "utf-8").trim()).toBe(
+      "sk-ant-test123",
+    );
   });
 
   it("stores a github token", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
-    const configDir = join(fakeHome, ".config", "prism");
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
+    const configDir = join(fakeHome, ".config", "tracecode");
 
-    const { stdout, exitCode } = run(fakeHome, "config", "set-key", "github", "ghp_testtoken");
+    const { stdout, exitCode } = run(
+      fakeHome,
+      "config",
+      "set-key",
+      "github",
+      "ghp_testtoken",
+    );
     expect(exitCode).toBe(0);
     expect(stdout).toContain("GitHub token stored");
-    expect(readFileSync(join(configDir, "token"), "utf-8").trim()).toBe("ghp_testtoken");
+    expect(readFileSync(join(configDir, "token"), "utf-8").trim()).toBe(
+      "ghp_testtoken",
+    );
   });
 
   it("rejects invalid target", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
     const { exitCode } = run(fakeHome, "config", "set-key", "invalid", "key");
     expect(exitCode).toBe(1);
   });
 
   it("rejects missing arguments", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
     const { exitCode } = run(fakeHome, "config", "set-key");
     expect(exitCode).toBe(1);
   });
@@ -63,15 +89,22 @@ describe("prism config set-key", () => {
 
 // ── removeProviderKey (unit test) ──────────────────────────────
 
-import { removeProviderKey, getActiveProvider, setActiveProvider, removeActiveProvider } from "../../src/config/tokens.js";
+import {
+  removeProviderKey,
+  getActiveProvider,
+  setActiveProvider,
+  removeActiveProvider,
+} from "../../src/config/tokens.js";
 import { homedir } from "node:os";
 
 describe("removeProviderKey", () => {
-  const configDir = join(homedir(), ".config", "prism");
+  const configDir = join(homedir(), ".config", "tracecode");
 
   it("removes an existing key file", () => {
     mkdirSync(configDir, { recursive: true });
-    writeFileSync(join(configDir, "testremove-key"), "test-key\n", { mode: 0o600 });
+    writeFileSync(join(configDir, "testremove-key"), "test-key\n", {
+      mode: 0o600,
+    });
 
     expect(existsSync(join(configDir, "testremove-key"))).toBe(true);
     const removed = removeProviderKey("testremove");
@@ -88,12 +121,14 @@ describe("removeProviderKey", () => {
 // ── active provider (unit tests) ──────────────────────────────
 
 describe("active provider", () => {
-  const configDir = join(homedir(), ".config", "prism");
+  const configDir = join(homedir(), ".config", "tracecode");
 
   it("setActiveProvider writes a file", () => {
     mkdirSync(configDir, { recursive: true });
     setActiveProvider("groq");
-    expect(readFileSync(join(configDir, "active-provider"), "utf-8").trim()).toBe("groq");
+    expect(
+      readFileSync(join(configDir, "active-provider"), "utf-8").trim(),
+    ).toBe("groq");
   });
 
   it("getActiveProvider reads it back", () => {

@@ -1,5 +1,6 @@
 # Technical Architecture
-## PRISM — Codebase Intelligence Tool
+
+## TRACECODE — Codebase Intelligence Tool
 
 ---
 
@@ -29,7 +30,7 @@ There is no always-on server for the MVP. The "backend" is the local Node.js/Typ
 
 ## 3. Database
 
-- **Local embedded database: SQLite**, stored inside the repo (e.g. `.prism/graph.db`) or in a user-level cache directory
+- **Local embedded database: SQLite**, stored inside the repo (e.g. `.tracecode/graph.db`) or in a user-level cache directory
 - Stores: parsed commit history, code structure graph (nodes = files/functions/symbols, edges = imports/calls), and cached PR/issue text
 - Chosen over a hosted DB because the tool is local-first — no server, no per-user database to manage, and it keeps repeat queries fast without re-parsing the whole repo
 - Schema is versioned so future `init --refresh` runs can detect stale caches and re-index incrementally rather than fully
@@ -106,7 +107,7 @@ Output layer
 
 ## 9. Deployment
 
-- **Distribution only, no hosting:** published as an npm package, run via `npx prism` or a global/local install
+- **Distribution only, no hosting:** published as an npm package, run via `npx tracecode` or a global/local install
 - **No servers to deploy or maintain** for the MVP, since all execution happens on the user's own machine
 - **CI for the project itself:** GitHub Actions to run tests and publish to npm on tagged releases
 - **Versioning:** semantic versioning, with the SQLite schema version checked on startup so users on an old cache get a clear "please re-run init" message rather than a silent failure

@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 
 // Query layer for `why` (commit history lookup) and `impact` (reverse
-// dependency traversal). See docs/prism-v1-build-spec.md Section 4 (Graph Model).
+// dependency traversal). See docs/tracecode-v1-build-spec.md Section 4 (Graph Model).
 
 export interface HistoryEntry {
   commitSha: string;
@@ -45,10 +45,11 @@ export interface ResolvedSymbol {
  */
 export function resolveSymbol(
   db: Database.Database,
-  target: string
+  target: string,
 ): ResolvedSymbol | null {
   const colonIdx = target.lastIndexOf(":");
-  const hasFilePrefix = colonIdx > 0 && target.substring(0, colonIdx).includes("/");
+  const hasFilePrefix =
+    colonIdx > 0 && target.substring(0, colonIdx).includes("/");
 
   if (hasFilePrefix) {
     const file = target.substring(0, colonIdx);
@@ -62,7 +63,7 @@ export function resolveSymbol(
 function resolveByFileAndName(
   db: Database.Database,
   file: string,
-  name: string
+  name: string,
 ): ResolvedSymbol | null {
   const row = db
     .prepare(
@@ -70,7 +71,7 @@ function resolveByFileAndName(
        FROM symbols s
        JOIN files f ON s.file_id = f.id
        WHERE f.path = ? AND s.name = ? AND s.kind != 'module'
-       LIMIT 1`
+       LIMIT 1`,
     )
     .get(file, name) as ResolvedSymbol | undefined;
 
@@ -79,14 +80,14 @@ function resolveByFileAndName(
 
 function resolveByName(
   db: Database.Database,
-  name: string
+  name: string,
 ): ResolvedSymbol | null {
   const rows = db
     .prepare(
       `SELECT s.id, s.name, s.kind, f.path as file, s.start_line, s.end_line
        FROM symbols s
        JOIN files f ON s.file_id = f.id
-       WHERE s.name = ? AND s.kind != 'module'`
+       WHERE s.name = ? AND s.kind != 'module'`,
     )
     .all(name) as ResolvedSymbol[];
 
@@ -102,14 +103,14 @@ function resolveByName(
  */
 export function listSymbolsByName(
   db: Database.Database,
-  name: string
+  name: string,
 ): ResolvedSymbol[] {
   return db
     .prepare(
       `SELECT s.id, s.name, s.kind, f.path as file, s.start_line, s.end_line
        FROM symbols s
        JOIN files f ON s.file_id = f.id
-       WHERE s.name = ? AND s.kind != 'module'`
+       WHERE s.name = ? AND s.kind != 'module'`,
     )
     .all(name) as ResolvedSymbol[];
 }
@@ -123,7 +124,7 @@ export function listSymbolsByName(
 export function queryHistoryForLocation(
   db: Database.Database,
   filePath: string,
-  line: number
+  line: number,
 ): HistoryEntry[] {
   const rows = db
     .prepare(
@@ -134,9 +135,12 @@ export function queryHistoryForLocation(
        WHERE f.path = ?
          AND cf.start_line <= ?
          AND (cf.end_line >= ? OR cf.end_line IS NULL)
-       ORDER BY c.date DESC`
+       ORDER BY c.date DESC`,
     )
-    .all(filePath, line, line) as Omit<HistoryEntry, "prNumbers" | "prTitles">[];
+    .all(filePath, line, line) as Omit<
+    HistoryEntry,
+    "prNumbers" | "prTitles"
+  >[];
 
   return enrichWithPrData(db, rows);
 }
@@ -147,14 +151,14 @@ export function queryHistoryForLocation(
  */
 export function queryHistoryForFunction(
   db: Database.Database,
-  functionName: string
+  functionName: string,
 ): HistoryEntry[] {
   const symbol = db
     .prepare(
       `SELECT s.file_id, s.start_line, s.end_line
        FROM symbols s
        WHERE s.name = ? AND s.kind != 'module'
-       LIMIT 1`
+       LIMIT 1`,
     )
     .get(functionName) as
     | { file_id: number; start_line: number; end_line: number }
@@ -170,9 +174,12 @@ export function queryHistoryForFunction(
        WHERE cf.file_id = ?
          AND cf.start_line <= ?
          AND (cf.end_line >= ? OR cf.end_line IS NULL)
-       ORDER BY c.date DESC`
+       ORDER BY c.date DESC`,
     )
-    .all(symbol.file_id, symbol.end_line, symbol.start_line) as Omit<HistoryEntry, "prNumbers" | "prTitles">[];
+    .all(symbol.file_id, symbol.end_line, symbol.start_line) as Omit<
+    HistoryEntry,
+    "prNumbers" | "prTitles"
+  >[];
 
   return enrichWithPrData(db, rows);
 }
@@ -188,13 +195,13 @@ export function queryHistoryForFunction(
 export function queryHistoryForSymbolId(
   db: Database.Database,
   symbolId: number,
-  limit: number = 5
+  limit: number = 5,
 ): HistoryEntry[] {
   const symbol = db
     .prepare(
       `SELECT s.file_id, s.start_line, s.end_line
        FROM symbols s
-       WHERE s.id = ?`
+       WHERE s.id = ?`,
     )
     .get(symbolId) as
     | { file_id: number; start_line: number; end_line: number }
@@ -211,9 +218,12 @@ export function queryHistoryForSymbolId(
          AND cf.start_line <= ?
          AND (cf.end_line >= ? OR cf.end_line IS NULL)
        ORDER BY c.date DESC
-       LIMIT ?`
+       LIMIT ?`,
     )
-    .all(symbol.file_id, symbol.end_line, symbol.start_line, limit) as Omit<HistoryEntry, "prNumbers" | "prTitles">[];
+    .all(symbol.file_id, symbol.end_line, symbol.start_line, limit) as Omit<
+    HistoryEntry,
+    "prNumbers" | "prTitles"
+  >[];
 
   return enrichWithPrData(db, rows);
 }
@@ -223,14 +233,14 @@ export function queryHistoryForSymbolId(
  */
 function enrichWithPrData(
   db: Database.Database,
-  rows: Omit<HistoryEntry, "prNumbers" | "prTitles">[]
+  rows: Omit<HistoryEntry, "prNumbers" | "prTitles">[],
 ): HistoryEntry[] {
   if (rows.length === 0) return [];
 
   // Check if PR data exists at all (avoids unnecessary query when no token configured)
-  const hasPrData = db
-    .prepare("SELECT 1 FROM pr_issue_links LIMIT 1")
-    .get() as object | undefined;
+  const hasPrData = db.prepare("SELECT 1 FROM pr_issue_links LIMIT 1").get() as
+    | object
+    | undefined;
   if (!hasPrData) {
     return rows.map((row) => ({ ...row, prNumbers: [], prTitles: [] }));
   }
@@ -242,12 +252,19 @@ function enrichWithPrData(
     .prepare(
       `SELECT commit_sha, pr_number, title
        FROM pr_issue_links
-       WHERE commit_sha IN (${placeholders})`
+       WHERE commit_sha IN (${placeholders})`,
     )
-    .all(...shas) as { commit_sha: string; pr_number: number | null; title: string | null }[];
+    .all(...shas) as {
+    commit_sha: string;
+    pr_number: number | null;
+    title: string | null;
+  }[];
 
   // Group PR data by commit SHA
-  const prBySha = new Map<string, { prNumbers: number[]; prTitles: string[] }>();
+  const prBySha = new Map<
+    string,
+    { prNumbers: number[]; prTitles: string[] }
+  >();
   for (const link of prLinks) {
     let entry = prBySha.get(link.commit_sha);
     if (!entry) {
@@ -290,7 +307,7 @@ function enrichWithPrData(
 export function queryDependents(
   db: Database.Database,
   symbolId: number,
-  maxDepth: number = Infinity
+  maxDepth: number = Infinity,
 ): Dependent[] {
   const results: Dependent[] = [];
   const visited = new Set<number>();
@@ -305,7 +322,7 @@ export function queryDependents(
      FROM edges e
      JOIN symbols s ON e.from_symbol_id = s.id
      JOIN files f ON s.file_id = f.id
-     WHERE e.to_symbol_id = ? AND e.edge_type IN ('calls', 'imports')`
+     WHERE e.to_symbol_id = ? AND e.edge_type IN ('calls', 'imports')`,
   );
 
   while (queue.length > 0) {
@@ -342,7 +359,12 @@ export function queryDependents(
   }
 
   // Sort by depth, then by file, then by symbol
-  results.sort((a, b) => a.depth - b.depth || a.file.localeCompare(b.file) || a.symbol.localeCompare(b.symbol));
+  results.sort(
+    (a, b) =>
+      a.depth - b.depth ||
+      a.file.localeCompare(b.file) ||
+      a.symbol.localeCompare(b.symbol),
+  );
 
   return results;
 }

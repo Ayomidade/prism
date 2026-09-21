@@ -1,4 +1,8 @@
-import { getProviderKey, getModel, getActiveProvider } from "../config/tokens.js";
+import {
+  getProviderKey,
+  getModel,
+  getActiveProvider,
+} from "../config/tokens.js";
 import { fetchAvailableModels as fetchOpenAiCompatibleModels } from "./openai-compatible.js";
 import { fetchAvailableModels as fetchAnthropicModels } from "./anthropic.js";
 
@@ -19,7 +23,7 @@ export interface ProviderDefinition {
 }
 
 // Default models are current as of this writing and deliberately
-// overridable via PRISM_AI_MODEL — provider lineups change often, and
+// overridable via TRACECODE_AI_MODEL — provider lineups change often, and
 // this registry shouldn't need a code change every time a vendor ships
 // a new default.
 const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
@@ -58,9 +62,15 @@ const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
   },
 };
 
-// Checked in this order when PRISM_AI_PROVIDER isn't set explicitly —
+// Checked in this order when TRACECODE_AI_PROVIDER isn't set explicitly —
 // first provider with a configured key wins.
-const AUTO_DETECT_ORDER: ProviderId[] = ["anthropic", "openai", "gemini", "groq", "custom"];
+const AUTO_DETECT_ORDER: ProviderId[] = [
+  "anthropic",
+  "openai",
+  "gemini",
+  "groq",
+  "custom",
+];
 
 export interface ResolvedProviderConfig {
   provider: ProviderDefinition;
@@ -75,30 +85,32 @@ export interface ResolvedProviderConfig {
  * Returns null if nothing is configured, meaning the caller should fall
  * back to the template summarizer.
  *
- * Throws if PRISM_AI_PROVIDER is set explicitly but that provider has no
+ * Throws if TRACECODE_AI_PROVIDER is set explicitly but that provider has no
  * key configured — an explicit request for a provider that isn't set up
  * should fail loudly, not silently fall back to a different one.
  */
 export function resolveAiProviderConfig(): ResolvedProviderConfig | null {
-  const explicitId = process.env.PRISM_AI_PROVIDER as ProviderId | undefined;
+  const explicitId = process.env.TRACECODE_AI_PROVIDER as
+    | ProviderId
+    | undefined;
 
   if (explicitId) {
     if (!PROVIDERS[explicitId]) {
       throw new Error(
-        `Unknown PRISM_AI_PROVIDER "${explicitId}". Expected one of: ${Object.keys(PROVIDERS).join(", ")}`
+        `Unknown TRACECODE_AI_PROVIDER "${explicitId}". Expected one of: ${Object.keys(PROVIDERS).join(", ")}`,
       );
     }
     const key = getProviderKey(explicitId);
     if (!key) {
       throw new Error(
-        `PRISM_AI_PROVIDER is set to "${explicitId}" but no key is configured for it. ` +
-          `Set PRISM_${explicitId.toUpperCase()}_KEY or store it with: prism config set-key ${explicitId} <key>`
+        `TRACECODE_AI_PROVIDER is set to "${explicitId}" but no key is configured for it. ` +
+          `Set TRACECODE_${explicitId.toUpperCase()}_KEY or store it with: tracecode config set-key ${explicitId} <key>`,
       );
     }
     return buildConfig(explicitId, key);
   }
 
-  // Check for a stored active provider preference (set by `prism config switch-provider`).
+  // Check for a stored active provider preference (set by `tracecode config switch-provider`).
   const storedId = getActiveProvider() as ProviderId | undefined;
   if (storedId && PROVIDERS[storedId]) {
     const key = getProviderKey(storedId);
@@ -129,11 +141,12 @@ export function resolveAiProviderConfig(): ResolvedProviderConfig | null {
 function buildConfig(id: ProviderId, apiKey: string): ResolvedProviderConfig {
   const provider = PROVIDERS[id];
   const model = getModel(id) || provider.defaultModel;
-  const baseUrl = id === "custom" ? process.env.PRISM_AI_BASE_URL : provider.baseUrl;
+  const baseUrl =
+    id === "custom" ? process.env.TRACECODE_AI_BASE_URL : provider.baseUrl;
 
   if (id === "custom" && (!baseUrl || !model)) {
     throw new Error(
-      "Custom AI provider requires both PRISM_AI_BASE_URL and PRISM_AI_MODEL to be set."
+      "Custom AI provider requires both TRACECODE_AI_BASE_URL and TRACECODE_AI_MODEL to be set.",
     );
   }
 
@@ -148,7 +161,7 @@ function buildConfig(id: ProviderId, apiKey: string): ResolvedProviderConfig {
 export async function fetchModelsForProvider(
   id: ProviderId,
   apiKey: string,
-  baseUrl?: string
+  baseUrl?: string,
 ): Promise<string[]> {
   const provider = PROVIDERS[id];
 

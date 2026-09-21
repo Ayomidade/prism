@@ -2,7 +2,7 @@
 // schema.ts — SQLite DDL for the local graph store
 // ──────────────────────────────────────────────────────────────────────────────
 //
-// This file defines the complete database schema that PRISM uses to store
+// This file defines the complete database schema that TRACECODE uses to store
 // everything it learns about a codebase: files, symbols, dependency edges,
 // commit history, and (optionally) GitHub PR/issue links.
 //
@@ -22,21 +22,21 @@
 //
 //   meta                        key/value store for schema version + metadata
 //
-// How this fits into PRISM's data flow:
+// How this fits into TRACECODE's data flow:
 //
-//   1. prism init runs git log/blame + AST parsing
+//   1. tracecode init runs git log/blame + AST parsing
 //   2. Parsed data is inserted into these tables via repository.ts helpers
-//   3. prism why queries commit_files + commits + pr_issue_links
-//   4. prism impact queries symbols + edges (reverse traversal)
+//   3. tracecode why queries commit_files + commits + pr_issue_links
+//   4. tracecode impact queries symbols + edges (reverse traversal)
 //
-// See also: docs/prism-v1-build-spec.md Section 3 for the full schema rationale.
+// See also: docs/tracecode-v1-build-spec.md Section 3 for the full schema rationale.
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** Current schema version. Increment when DDL changes require a re-index. */
 export const SCHEMA_VERSION = "3"; // was "2" — added dedup indexes on symbols + edges
 
 /**
- * Complete DDL for all PRISM tables.
+ * Complete DDL for all TRACECODE tables.
  * Uses CREATE TABLE IF NOT EXISTS so it's safe to run on every `openDatabase()`.
  *
  * Tables:

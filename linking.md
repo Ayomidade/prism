@@ -4,22 +4,22 @@
 
 ### Day 2 — Git ingestion + SQLite persistence
 
-| Module | File | What it does |
-|--------|------|-------------|
-| Git log parser | `src/ingestion/git/log.ts` | `parseGitLog()` — shells out to `git log`, returns structured `ParsedCommit[]` |
-| Git blame parser | `src/ingestion/git/blame.ts` | `parseGitBlame()` — shells out to `git blame --porcelain`, returns line→SHA mapping |
-| Schema v2 | `src/store/schema.ts` | Added unique index on `files.path`, bumped version to `"2"` |
-| Repository | `src/store/repository.ts` | `insertFile`, `insertCommit`, `insertSymbol`, `insertEdge` — all working with dedup |
-| Tests | `test/unit/blame.test.ts`, `test/unit/repository.test.ts` | 15 new tests across both files |
+| Module           | File                                                      | What it does                                                                        |
+| ---------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Git log parser   | `src/ingestion/git/log.ts`                                | `parseGitLog()` — shells out to `git log`, returns structured `ParsedCommit[]`      |
+| Git blame parser | `src/ingestion/git/blame.ts`                              | `parseGitBlame()` — shells out to `git blame --porcelain`, returns line→SHA mapping |
+| Schema v2        | `src/store/schema.ts`                                     | Added unique index on `files.path`, bumped version to `"2"`                         |
+| Repository       | `src/store/repository.ts`                                 | `insertFile`, `insertCommit`, `insertSymbol`, `insertEdge` — all working with dedup |
+| Tests            | `test/unit/blame.test.ts`, `test/unit/repository.test.ts` | 15 new tests across both files                                                      |
 
 ### Day 3 — AST parsing + code graph
 
-| Module | File | What it does |
-|--------|------|-------------|
-| AST parser | `src/graph/parser.ts` | `parseSourceFile()` — uses ts-morph to extract symbols + relative imports |
-| Graph builder | `src/graph/build-graph.ts` | `buildGraph()` — inserts module symbols + import edges into SQLite |
-| Tests | `test/unit/parser.test.ts`, `test/unit/build-graph.test.ts` | 13 new tests across both files |
-  
+| Module        | File                                                        | What it does                                                              |
+| ------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| AST parser    | `src/graph/parser.ts`                                       | `parseSourceFile()` — uses ts-morph to extract symbols + relative imports |
+| Graph builder | `src/graph/build-graph.ts`                                  | `buildGraph()` — inserts module symbols + import edges into SQLite        |
+| Tests         | `test/unit/parser.test.ts`, `test/unit/build-graph.test.ts` | 13 new tests across both files                                            |
+
 **Test suite: 39/39 passing, typecheck clean.**
 
 ---
@@ -60,13 +60,13 @@ The `\x1e` comes **after** the header but **before** the numstat. So splitting o
 
 ### 4. Edge Cases Handled
 
-| Case | How |
-|------|-----|
-| Merge commits (2+ parents) | No numstat produced by git — `filesChanged` stays `[]` |
-| Root commits (0 parents) | Normal case — git diffs against empty tree automatically |
-| Binary files | numstat shows `-` for additions/deletions — mapped to `0` |
-| Empty repos | `git log` returns empty output or throws — returns `[]` |
-| Malformed lines | Skipped (header with < 4 fields, numstat with < 3 tab-separated parts) |
+| Case                       | How                                                                    |
+| -------------------------- | ---------------------------------------------------------------------- |
+| Merge commits (2+ parents) | No numstat produced by git — `filesChanged` stays `[]`                 |
+| Root commits (0 parents)   | Normal case — git diffs against empty tree automatically               |
+| Binary files               | numstat shows `-` for additions/deletions — mapped to `0`              |
+| Empty repos                | `git log` returns empty output or throws — returns `[]`                |
+| Malformed lines            | Skipped (header with < 4 fields, numstat with < 3 tab-separated parts) |
 
 ---
 
@@ -87,6 +87,7 @@ The `\x1e` comes **after** the header but **before** the numstat. So splitting o
 **What happened:** First test returned only 1 commit when there are 7 in the repo.
 
 **Root cause:** The `\x1e` record separator appears right after the commit header in git's output, but the numstat lines come **after** the `\x1e`. Splitting on `\x1e` and treating each block as a complete commit meant:
+
 - Block 0: header only (no numstat)
 - Block 1: numstat for commit 0 + header for commit 1
 - Block 2: numstat for commit 1 + header for commit 2
@@ -95,12 +96,14 @@ The `\x1e` comes **after** the header but **before** the numstat. So splitting o
 The parser saw 8 blocks (7 commits + trailing empty), but the filter logic and header detection were confused by the interleaved structure.
 
 **Debugging steps:**
+
 1. Added character-level analysis of the raw output to map separator positions
 2. Discovered 7 `\x1e` characters but the split produced 8 blocks
 3. Inspected block contents — confirmed numstat was in the wrong block
 4. Rewrote parser to process lines sequentially instead of splitting on separators
 
 **Fix:** Replaced block-split approach with a stateful line-by-line parser:
+
 - When a line contains `\x1f` → it's a header → finalize previous commit, start new one
 - Otherwise → it's a numstat line → accumulate into current commit's `filesChanged`
 - Blank lines between header and numstat → skipped
@@ -124,6 +127,7 @@ The parser saw 8 blocks (7 commits + trailing empty), but the filter logic and h
 **Root cause:** The format string is `%H\x1f%an\x1f%aI\x1f%s\x1e` — there's no newline between `%s` (message) and `\x1e` (record separator). Git outputs them on the same line: `sha\x1fauthor\x1fdate\x1fmessage\x1e`. When we split on `\x1f`, the last element becomes `"message\x1e"`, not `"message"`. The separator that's supposed to mark the end of the header is getting concatenated onto the message field.
 
 **Fix:** Strip the record separator from the message after parsing:
+
 ```typescript
 message: message.replace(RECORD_SEP, ""),
 ```
@@ -145,6 +149,7 @@ Ran `parseGitLog()` against this repo's own git history. Results:
 - File change counts (additions/deletions) are accurate per commit
 
 Example output:
+
 ```
 SHA: b81a4fed
 Author: Onyeka Amechi
@@ -162,12 +167,12 @@ Files changed: 3
 
 All Day 2 tasks are complete. Next up is Day 3: AST parsing + code graph construction.
 
-| Task | File | Status |
-|------|------|--------|
-| Parse git log | `src/ingestion/git/log.ts` | ✅ Done |
-| Parse git blame | `src/ingestion/git/blame.ts` | ✅ Done |
-| Persist commits to SQLite | `src/store/repository.ts` | ✅ Done |
-| Update schema (unique index) | `src/store/schema.ts` | ✅ Done |
+| Task                         | File                         | Status  |
+| ---------------------------- | ---------------------------- | ------- |
+| Parse git log                | `src/ingestion/git/log.ts`   | ✅ Done |
+| Parse git blame              | `src/ingestion/git/blame.ts` | ✅ Done |
+| Persist commits to SQLite    | `src/store/repository.ts`    | ✅ Done |
+| Update schema (unique index) | `src/store/schema.ts`        | ✅ Done |
 
 ---
 
@@ -200,13 +205,13 @@ Used `execFileSync("git", ["blame", "--porcelain", filePath], ...)` instead of `
 
 ### Verification
 
-| Test | Result |
-|------|--------|
-| `src/store/db.ts` (149 lines) | 149 lines attributed, all from `192550a4` |
-| `test/unit/db.test.ts` (116 lines) | 116 lines attributed, all from `f57ecd19` |
-| `src/cli/index.ts` (20 lines) | 20 lines attributed, all from `cf68f01b` |
-| Nonexistent file | Returns `[]` (error caught gracefully) |
-| First/last line numbers | Line 1 and line N match actual file bounds |
+| Test                               | Result                                     |
+| ---------------------------------- | ------------------------------------------ |
+| `src/store/db.ts` (149 lines)      | 149 lines attributed, all from `192550a4`  |
+| `test/unit/db.test.ts` (116 lines) | 116 lines attributed, all from `f57ecd19`  |
+| `src/cli/index.ts` (20 lines)      | 20 lines attributed, all from `cf68f01b`   |
+| Nonexistent file                   | Returns `[]` (error caught gracefully)     |
+| First/last line numbers            | Line 1 and line N match actual file bounds |
 
 All line counts match `wc -l` output. Line numbers are correct (1-indexed, matching the file's actual line numbers).
 
@@ -224,12 +229,12 @@ The one existing test that hardcoded `expect(row.value).toBe("1")` was updated t
 
 Implemented all four insert functions:
 
-| Function | Strategy | Notes |
-|----------|----------|-------|
-| `insertFile` | `INSERT ... ON CONFLICT(path) DO UPDATE SET path = excluded.path RETURNING id` | Atomic dedup — same path always returns same ID. The `DO UPDATE SET path = excluded.path` is a no-op (sets a column to its own value) purely to make `RETURNING id` fire on conflict too. |
-| `insertCommit` | `INSERT OR IGNORE` | `sha` is already PK from schema v1, so no schema change needed. Ignores duplicate SHAs silently. |
-| `insertSymbol` | `INSERT ... RETURNING id` | Day 3 scope (AST parsing), implemented now for interface consistency. |
-| `insertEdge` | `INSERT ...` | Day 3 scope, implemented now for consistency. |
+| Function       | Strategy                                                                       | Notes                                                                                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `insertFile`   | `INSERT ... ON CONFLICT(path) DO UPDATE SET path = excluded.path RETURNING id` | Atomic dedup — same path always returns same ID. The `DO UPDATE SET path = excluded.path` is a no-op (sets a column to its own value) purely to make `RETURNING id` fire on conflict too. |
+| `insertCommit` | `INSERT OR IGNORE`                                                             | `sha` is already PK from schema v1, so no schema change needed. Ignores duplicate SHAs silently.                                                                                          |
+| `insertSymbol` | `INSERT ... RETURNING id`                                                      | Day 3 scope (AST parsing), implemented now for interface consistency.                                                                                                                     |
+| `insertEdge`   | `INSERT ...`                                                                   | Day 3 scope, implemented now for consistency.                                                                                                                                             |
 
 ### Verification
 
@@ -271,10 +276,12 @@ No schema change needed. Day 4's function/class symbols will sit inside the same
 ### parser.ts — What It Does
 
 Uses `ts-morph` to parse each source file and extract:
+
 - **Symbols:** top-level functions, classes, named exports (with line ranges)
 - **Imports:** only relative paths (`./foo`, `../bar`) — external packages excluded
 
 Verified against 10 real source files:
+
 - All relative imports captured correctly (7/7 cross-checks passed)
 - External packages (`better-sqlite3`, `commander`, `ts-morph`, etc.) correctly excluded
 - Line ranges match actual source positions
@@ -283,10 +290,12 @@ Verified against 10 real source files:
 ### build-graph.ts — What It Does
 
 Two-pass approach:
+
 1. **First pass:** insert all files + module symbols (need the IDs for edge creation)
 2. **Second pass:** resolve each relative import to an actual file path, insert import edge
 
 Import resolution handles TypeScript's common patterns:
+
 - `.js` → `.ts` (TypeScript source uses .js extensions)
 - Bare path → `index.ts` (folder imports)
 - `.jsx` → `.tsx`
@@ -316,6 +325,7 @@ The blame test that checks "single-commit files" kept failing because it used `s
 Extended the graph from file-level structure (Day 3) to symbol-level call relationships:
 
 **parser.ts changes:**
+
 - `ParsedSymbol` gains `calls: string[]` — simple function-call names extracted from each symbol's body via `collectCalls()`
 - New `NamedImport` interface tracks which named identifiers come from which import specifier
 - `ParsedFile` gains `namedImports: NamedImport[]` — used for call resolution, separate from `imports[]` which drives file-level import edges
@@ -323,6 +333,7 @@ Extended the graph from file-level structure (Day 3) to symbol-level call relati
 - Type-only imports excluded from `namedImports` (they don't exist at runtime)
 
 **build-graph.ts changes:**
+
 - Pass 1 now inserts real symbols (functions, classes, exports) alongside the module placeholder
 - Pass 2 builds an import-name-to-file resolution map from `namedImports`
 - Pass 3 inserts both `imports` edges (module→module) and `calls` edges (symbol→symbol)
@@ -330,6 +341,7 @@ Extended the graph from file-level structure (Day 3) to symbol-level call relati
 - Ambiguous imports (same name from multiple files) are skipped, not guessed
 
 **Test coverage:**
+
 - `parser.test.ts`: 13 tests (was 7) — named imports, type-only exclusion, call collection, method-call exclusion
 - `build-graph.test.ts`: 10 tests (was 5) — symbol persistence, local calls, imported calls, external package skip, ambiguous name skip
 - **50/50 total tests pass**
@@ -337,6 +349,7 @@ Extended the graph from file-level structure (Day 3) to symbol-level call relati
 ### Verified against real repo
 
 9 files parsed → 32 symbols → 6 import edges → 13 call edges. All cross-file relationships correct:
+
 - `buildGraph` → `insertFile`, `insertSymbol`, `insertEdge`, `resolveImport` (cross-file imports)
 - `openDatabase` → `getStoredSchemaVersion`, `setStoredSchemaVersion` (local calls)
 - `checkSchemaVersion` → `getStoredSchemaVersion` (local call)
@@ -355,24 +368,28 @@ Method calls (`foo.bar()`), calls through destructuring, and re-exports are skip
 
 ### What we built
 
-Implemented the first user-facing command: `prism why <file:line>` and `prism why --function <name>`.
+Implemented the first user-facing command: `tracecode why <file:line>` and `tracecode why --function <name>`.
 
 **query.ts** — Two query functions:
+
 - `queryHistoryForLocation(db, filePath, line)` — finds commit_files rows where the line falls within the committed range, joins to commits for metadata, returns most-recent-first
 - `queryHistoryForFunction(db, functionName)` — resolves the symbol to its file + line range (skipping module symbols), then queries commit_files for that range. Handles the "two-step" lookup: name → symbol → file → commits
 
 **template.ts** — Template-based summary builder:
+
 - `buildTemplateSummary(history, target)` — human-readable text output with commit dates, SHAs, authors, and first-line messages. Shows up to 10 commits, truncation notice for more. Tags with `confidence: documented` when history exists
 - `buildTemplateSummaryJson(history, target)` — structured object for `--json` mode
 - Empty history returns a clear "no history found" message instead of fabricating
 
 **why.ts** — CLI wiring:
+
 - Parses `file:line` format via regex, validates before querying
 - `--function <name>` routes to `queryHistoryForFunction`
 - `--json` flag switches to JSON output
-- Fails clearly when `.prism/graph.db` doesn't exist (suggests `prism init`)
+- Fails clearly when `.tracecode/graph.db` doesn't exist (suggests `tracecode init`)
 
 **Test coverage:**
+
 - `query.test.ts`: 9 tests (boundary lines, exact matches, empty results, metadata, function lookup, module symbol skip)
 - `template.test.ts`: 7 tests (formatting, truncation, empty history, JSON output, multi-line messages)
 - **66/66 total tests pass**
@@ -380,8 +397,8 @@ Implemented the first user-facing command: `prism why <file:line>` and `prism wh
 ### Design decisions
 
 - **Query overlap logic:** `start_line <= target AND (end_line >= target OR end_line IS NULL)` — handles both bounded ranges and NULL end_lines (which git blame produces for partial files)
-- **Function lookup is a two-step join:** name → symbols table → file_id + line range → commit_files. This means `prism why --function openDatabase` works even though the user doesn't know which file it's in
-- **Module symbols excluded from function lookup:** `WHERE kind != 'module'` prevents `prism why --function src/a.ts` from matching the entire-file module symbol
+- **Function lookup is a two-step join:** name → symbols table → file_id + line range → commit_files. This means `tracecode why --function openDatabase` works even though the user doesn't know which file it's in
+- **Module symbols excluded from function lookup:** `WHERE kind != 'module'` prevents `tracecode why --function src/a.ts` from matching the entire-file module symbol
 - **Template summary truncates at 10 commits:** Prevents overwhelming output on heavily-modified code. The "and N more commits" notice preserves the full count
 - **Confidence tag is "documented" or "none":** No "inferred" tag for v1 since we don't have AI summarization yet. The tag becomes meaningful in Phase 3
 
@@ -391,14 +408,16 @@ Implemented the first user-facing command: `prism why <file:line>` and `prism wh
 
 ### What we built
 
-Implemented the second graph-traversal command: `prism impact <symbol>`.
+Implemented the second graph-traversal command: `tracecode impact <symbol>`.
 
 **query.ts additions:**
+
 - `resolveSymbol(db, target)` — resolves `symbol` or `file:symbol` format. Returns `ResolvedSymbol | null`. Ambiguous names (multiple matches without file prefix) return null
 - `listSymbolsByName(db, name)` — returns all non-module matches for ambiguity reporting
 - `queryDependents(db, symbolId, maxDepth?)` — BFS traversal of reverse `calls` edges. Uses a queue, de-duplicates visited nodes, returns `Dependent[]` sorted by depth then file then symbol
 
 **impact.ts CLI:**
+
 - Parses `<symbol>` argument, resolves via `resolveSymbol`, queries `queryDependents`
 - Default: terminal tree grouped by file, indented by depth
 - `--json`: flat list with `{ target, dependents }` structure
@@ -406,6 +425,7 @@ Implemented the second graph-traversal command: `prism impact <symbol>`.
 - Not found: clear error message
 
 **Test coverage:**
+
 - `query.test.ts`: 12 new tests (resolveSymbol unique/ambiguous/file:name/module skip, listSymbolsByName, queryDependents direct/transitive/empty/maxDepth/cycle handling)
 - **78/78 total tests pass**
 
@@ -426,34 +446,39 @@ Implemented the second graph-traversal command: `prism impact <symbol>`.
 Integrated GitHub PR/issue data into the `why` command output.
 
 **tokens.ts** — Token storage:
-- `getGitHubToken()` checks (1) `PRISM_GITHUB_TOKEN` env var, (2) `~/.config/prism/token` file
-- `setGitHubToken()` writes to `~/.config/prism/token` with mode 0o600
+
+- `getGitHubToken()` checks (1) `TRACECODE_GITHUB_TOKEN` env var, (2) `~/.config/tracecode/token` file
+- `setGitHubToken()` writes to `~/.config/tracecode/token` with mode 0o600
 - Simple file-based storage for v1. OS keychain is a post-v1 enhancement
 
 **pr-issue-link.ts** — GitHub API integration:
+
 - `linkCommitsToPrsAndIssues(client, commitShas)` — batch fetches PR associations for commits via `listPullRequestsAssociatedWithCommit`. Rate-limit aware (stops at <10 remaining). Capped at 200 commits max
 - `fetchPrDetails(client, prNumbers)` — fetches PR title+body for specific PR numbers
-- Owner/repo resolved from env vars (`PRISM_GITHUB_OWNER`, `PRISM_GITHUB_REPO`) or git remote URL
+- Owner/repo resolved from env vars (`TRACECODE_GITHUB_OWNER`, `TRACECODE_GITHUB_REPO`) or git remote URL
 - PR body truncated to 500 chars for storage
 
 **repository.ts** — new `insertPrIssueLink()` function (INSERT OR IGNORE)
 
 **query.ts** — History queries now include PR/issue data:
+
 - `HistoryEntry` gains `prNumbers: number[]` and `prTitles: string[]`
 - `enrichWithPrData()` helper batch-queries `pr_issue_links` table and merges into results
 - Both `queryHistoryForLocation` and `queryHistoryForFunction` use enrichment
 
 **template.ts** — PR info in output:
+
 - Shows `PR #42: Title` below each commit when available
 - Falls back to `PR #99` when title is missing
 
 **Test coverage:**
+
 - `template.test.ts`: 2 new tests (PR number+title display, PR without title)
 - **80/80 total tests pass**
 
 ### Design decisions
 
-- **Env vars override file storage:** `PRISM_GITHUB_TOKEN` takes precedence over `~/.config/prism/token`. This supports both CI (env vars) and local dev (config file)
+- **Env vars override file storage:** `TRACECODE_GITHUB_TOKEN` takes precedence over `~/.config/tracecode/token`. This supports both CI (env vars) and local dev (config file)
 - **Rate limit safety:** Stops PR lookups when remaining API calls < 10, returning partial results. No data loss — incomplete enrichment is better than a crash
 - **200 commit cap:** Prevents rate-limit exhaustion on large histories. The most recent 200 commits are typically the most relevant
 - **PR body truncation at 500 chars:** Avoids storing huge PR descriptions that would bloat the database. The title is usually sufficient for context
@@ -483,52 +508,60 @@ Integrated GitHub PR/issue data into the `why` command output.
 
 ## Init Wiring (Day 8)
 
-`prism init` was the last stub. Wired it up with a child-process architecture to handle the native addon conflict.
+`tracecode init` was the last stub. Wired it up with a child-process architecture to handle the native addon conflict.
 
 ### Architecture
+
 ```
-prism init (main process)
+tracecode init (main process)
 ├── parseGitLog()         ← no native addons
 ├── parseGitBlame()       ← no native addons
 ├── spawn: db-write.ts    ← better-sqlite3 only, writes commits + commit_files
-├── spawn: ast-parse.ts   ← ts-morph only, writes .prism/parsed.json
+├── spawn: ast-parse.ts   ← ts-morph only, writes .tracecode/parsed.json
 ├── spawn: graph-load.ts  ← better-sqlite3 only, reads JSON, writes symbols + edges
 └── spawn: github-fetch.ts ← Octokit, writes pr_issue_links (optional)
 ```
 
 ### Why child processes?
+
 `better-sqlite3` and `ts-morph` both register C++ cleanup hooks via `node::AddEnvironmentCleanupHook`. When both are loaded in the same process, their destructors conflict during Node.js teardown:
+
 ```
 Statement::~Statement()
   → RemoveEnvironmentCleanupHook()
     → Assertion failed: (env) != nullptr
 ```
+
 This fires even if you don't call `db.close()` — it happens during GC. Running each dependency in a separate process isolates the crash (each child exits cleanly before its GC runs).
 
 ### Files created
+
 - `src/ingestion/ast-parse.ts` — child process, ts-morph only, outputs JSON
 - `src/ingestion/db-write.ts` — child process, better-sqlite3 only, writes commits/files
 - `src/ingestion/graph-load.ts` — child process, better-sqlite3 only, writes symbols/edges
 - `src/cli/commands/init.ts` — orchestrator, spawns children, no native addons
 
 ### Key decisions
+
 - **No `db.close()`** in any process — let GC handle it; data is flushed via WAL
 - **Test files excluded** from AST parsing — `project.getSourceFile()` returns undefined for files not in tsconfig; filter before parsing
 - **Full re-index** on every `init` — `DELETE FROM edges; DELETE FROM symbols;` at start of graph-load.ts
 
 ### End-to-end verified
+
 ```
-prism init → 27 commits, 28 files, 2990 commit_files, 19 parsed, 79 symbols, 52 edges
-prism why src/store/db.ts:35 → documented (1 commit)
-prism why --function openDatabase → documented (1 commit)
-prism impact insertSymbol → 1 dependent (buildGraph)
+tracecode init → 27 commits, 28 files, 2990 commit_files, 19 parsed, 79 symbols, 52 edges
+tracecode why src/store/db.ts:35 → documented (1 commit)
+tracecode why --function openDatabase → documented (1 commit)
+tracecode impact insertSymbol → 1 dependent (buildGraph)
 ```
 
 ### TODO (Day 8)
-- [ ] Phase 3: AI context assembly (`prism context`)
+
+- [ ] Phase 3: AI context assembly (`tracecode context`)
 - [ ] Phase 3: Polish, docs, ship
-- [ ] Consider: `--json` output for `prism impact`
-- [ ] Consider: `--depth` flag for `prism impact` BFS
+- [ ] Consider: `--json` output for `tracecode impact`
+- [ ] Consider: `--depth` flag for `tracecode impact` BFS
 
 9. **`init` child processes need generous timeouts.** The init pipeline spawns 4+ `npx tsx` child processes. Each has Node.js startup + tsx transpilation + module loading overhead. On a loaded machine (vitest forks competing for CPU), the full pipeline can take 40+ seconds. Integration test timeouts must be 4 minutes, not 60 seconds.
 
@@ -544,25 +577,25 @@ prism impact insertSymbol → 1 dependent (buildGraph)
 
 Comprehensive bug-fix pass across the entire codebase. Created missing files, wired in the AI summarizer, added integration tests, and fixed 15 identified issues across all severity levels.
 
-| Module | File | What changed |
-|--------|------|-------------|
-| GitHub fetch | `src/ingestion/github-fetch.ts` | **Created.** Missing child process that `init.ts` referenced — was crashing at runtime when GitHub token configured |
-| AI summarizer | `src/summarize/ai.ts` | Increased `MAX_TOKENS` 512→1024; dynamic import of `@anthropic-ai/sdk` (graceful if missing); API error fallback to template |
-| Why command | `src/cli/commands/why.ts` | Wired in AI summarizer — checks for Anthropic key, falls back to template |
-| Init command | `src/cli/commands/init.ts` | Extracted `runInit()` for testability; implemented `--refresh` flag (deletes DB + rebuilds) |
-| Schema | `src/store/schema.ts` | Bumped to v3; added `idx_edges_dedup` and `idx_commit_files_dedup` unique indexes |
-| DB layer | `src/store/db.ts` | Added `deduplicateEdges()` + `deduplicateSymbols()` migration before schema DDL |
-| Repository | `src/store/repository.ts` | `insertSymbol`/`insertEdge` now dedup via SELECT-first pattern |
-| DB write | `src/ingestion/db-write.ts` | Stores line ranges (merged consecutive lines) instead of per-line rows; dedup migration for existing data |
-| Query | `src/graph/query.ts` | `enrichWithPrData` skips query when `pr_issue_links` table is empty |
-| Rename trace | `src/ingestion/git/rename-trace.ts` | **Implemented.** Follows file renames via `git log --follow --name-status --diff-filter=R` |
-| Terminal | `src/cli/output/terminal.ts` | Removed dead `formatWhyForTerminal`/`formatImpactForTerminal` stubs |
-| Package | `package.json` | Removed unused deps (`approve`, `scripts`, `esbuild`); cleaned `allowScripts` |
-| Tests | `test/unit/ai-summarizer.test.ts` | **Created.** 8 tests with mocked Anthropic API |
-| Tests | `test/unit/rename-trace.test.ts` | **Created.** 5 tests against real git history |
-| Tests | `test/integration/init-query.test.ts` | **Created.** 17 end-to-end tests (init pipeline + why + impact queries) |
-| Tests | `test/unit/blame.test.ts` | Switched stable test file from `db.ts` to `client.ts` |
-| Tests | `test/unit/db.test.ts` | Updated expected schema version to `"3"` |
+| Module        | File                                  | What changed                                                                                                                 |
+| ------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| GitHub fetch  | `src/ingestion/github-fetch.ts`       | **Created.** Missing child process that `init.ts` referenced — was crashing at runtime when GitHub token configured          |
+| AI summarizer | `src/summarize/ai.ts`                 | Increased `MAX_TOKENS` 512→1024; dynamic import of `@anthropic-ai/sdk` (graceful if missing); API error fallback to template |
+| Why command   | `src/cli/commands/why.ts`             | Wired in AI summarizer — checks for Anthropic key, falls back to template                                                    |
+| Init command  | `src/cli/commands/init.ts`            | Extracted `runInit()` for testability; implemented `--refresh` flag (deletes DB + rebuilds)                                  |
+| Schema        | `src/store/schema.ts`                 | Bumped to v3; added `idx_edges_dedup` and `idx_commit_files_dedup` unique indexes                                            |
+| DB layer      | `src/store/db.ts`                     | Added `deduplicateEdges()` + `deduplicateSymbols()` migration before schema DDL                                              |
+| Repository    | `src/store/repository.ts`             | `insertSymbol`/`insertEdge` now dedup via SELECT-first pattern                                                               |
+| DB write      | `src/ingestion/db-write.ts`           | Stores line ranges (merged consecutive lines) instead of per-line rows; dedup migration for existing data                    |
+| Query         | `src/graph/query.ts`                  | `enrichWithPrData` skips query when `pr_issue_links` table is empty                                                          |
+| Rename trace  | `src/ingestion/git/rename-trace.ts`   | **Implemented.** Follows file renames via `git log --follow --name-status --diff-filter=R`                                   |
+| Terminal      | `src/cli/output/terminal.ts`          | Removed dead `formatWhyForTerminal`/`formatImpactForTerminal` stubs                                                          |
+| Package       | `package.json`                        | Removed unused deps (`approve`, `scripts`, `esbuild`); cleaned `allowScripts`                                                |
+| Tests         | `test/unit/ai-summarizer.test.ts`     | **Created.** 8 tests with mocked Anthropic API                                                                               |
+| Tests         | `test/unit/rename-trace.test.ts`      | **Created.** 5 tests against real git history                                                                                |
+| Tests         | `test/integration/init-query.test.ts` | **Created.** 17 end-to-end tests (init pipeline + why + impact queries)                                                      |
+| Tests         | `test/unit/blame.test.ts`             | Switched stable test file from `db.ts` to `client.ts`                                                                        |
+| Tests         | `test/unit/db.test.ts`                | Updated expected schema version to `"3"`                                                                                     |
 
 **Test suite: 110/110 passing, typecheck clean.**
 
@@ -570,7 +603,7 @@ Comprehensive bug-fix pass across the entire codebase. Created missing files, wi
 
 ### Issue #1 (CRITICAL): Missing `github-fetch.ts`
 
-**What happened:** `init.ts` referenced `src/ingestion/github-fetch.ts` as a child process, but the file didn't exist. Running `prism init` with a GitHub token configured would crash with `ENOENT`.
+**What happened:** `init.ts` referenced `src/ingestion/github-fetch.ts` as a child process, but the file didn't exist. Running `tracecode init` with a GitHub token configured would crash with `ENOENT`.
 
 **Fix:** Created the child process script that reads commit SHAs from stdin, creates an Octokit client, calls `linkCommitsToPrsAndIssues()`, and writes results to SQLite via `insertPrIssueLink()`.
 
@@ -588,7 +621,7 @@ Comprehensive bug-fix pass across the entire codebase. Created missing files, wi
 
 **What happened:** The CLI accepted `--refresh` but never read the option value. The flag was documented in the README but did nothing.
 
-**Fix:** Implemented the flag — when `--refresh` is passed, the init command deletes `.prism/graph.db`, WAL/SHM files, and `parsed.json` before rebuilding from scratch.
+**Fix:** Implemented the flag — when `--refresh` is passed, the init command deletes `.tracecode/graph.db`, WAL/SHM files, and `parsed.json` before rebuilding from scratch.
 
 ---
 
@@ -659,7 +692,8 @@ Comprehensive bug-fix pass across the entire codebase. Created missing files, wi
 ### Integration tests
 
 Created `test/integration/init-query.test.ts` with 17 end-to-end tests that:
-1. Spawn `prism init` via CLI (isolating ts-morph in a child process to avoid the native addon crash)
+
+1. Spawn `tracecode init` via CLI (isolating ts-morph in a child process to avoid the native addon crash)
 2. Verify the database has all required tables and data
 3. Test `why` queries (location, function, empty results, ordering)
 4. Test `impact` queries (symbol resolution, disambiguation, cross-file dependents)
@@ -672,9 +706,10 @@ Created `test/integration/init-query.test.ts` with 17 end-to-end tests that:
 
 ### Schema migration (v2 → v3)
 
-The schema version bump from `"2"` to `"3"` triggers a forced re-index: `openDatabase()` throws "schema is out of date" when it finds v2 in the `meta` table, telling the user to run `prism init --refresh`.
+The schema version bump from `"2"` to `"3"` triggers a forced re-index: `openDatabase()` throws "schema is out of date" when it finds v2 in the `meta` table, telling the user to run `tracecode init --refresh`.
 
 New DDL in v3:
+
 ```sql
 CREATE UNIQUE INDEX IF NOT EXISTS idx_edges_dedup
   ON edges(from_symbol_id, to_symbol_id, edge_type);
@@ -689,10 +724,10 @@ The `deduplicateEdges()` and `deduplicateSymbols()` migrations in `db.ts` run **
 
 ### What remains
 
-| Task | Status |
-|------|--------|
-| Phase 3: HTML export for `impact` results | Not started |
-| `--depth` flag for `prism impact` BFS | Not started (query.ts already supports `maxDepth`) |
-| `--json` output for `prism impact` | ✅ Done |
-| Incremental re-index (only changed files) | Post-v1 optimization |
-| npm publish + demo | Not started |
+| Task                                      | Status                                             |
+| ----------------------------------------- | -------------------------------------------------- |
+| Phase 3: HTML export for `impact` results | Not started                                        |
+| `--depth` flag for `tracecode impact` BFS | Not started (query.ts already supports `maxDepth`) |
+| `--json` output for `tracecode impact`    | ✅ Done                                            |
+| Incremental re-index (only changed files) | Post-v1 optimization                               |
+| npm publish + demo                        | Not started                                        |

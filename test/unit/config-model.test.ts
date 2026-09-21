@@ -1,12 +1,22 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync, rmSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  rmSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const CLI = "src/cli/index.ts";
 
-function run(homeDir: string, ...args: string[]): { stdout: string; exitCode: number } {
+function run(
+  homeDir: string,
+  ...args: string[]
+): { stdout: string; exitCode: number } {
   try {
     const stdout = execFileSync("npx", ["tsx", CLI, ...args], {
       encoding: "utf-8",
@@ -19,7 +29,7 @@ function run(homeDir: string, ...args: string[]): { stdout: string; exitCode: nu
   }
 }
 
-describe("prism config set-model", () => {
+describe("tracecode config set-model", () => {
   let fakeHome: string;
 
   afterEach(() => {
@@ -29,29 +39,43 @@ describe("prism config set-model", () => {
   });
 
   it("stores a model for a provider", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
-    const configDir = join(fakeHome, ".config", "prism");
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
+    const configDir = join(fakeHome, ".config", "tracecode");
 
-    const { stdout, exitCode } = run(fakeHome, "config", "set-model", "openai", "gpt-4o");
+    const { stdout, exitCode } = run(
+      fakeHome,
+      "config",
+      "set-model",
+      "openai",
+      "gpt-4o",
+    );
     expect(exitCode).toBe(0);
     expect(stdout).toContain("openai model set to gpt-4o");
-    expect(readFileSync(join(configDir, "openai-model"), "utf-8").trim()).toBe("gpt-4o");
+    expect(readFileSync(join(configDir, "openai-model"), "utf-8").trim()).toBe(
+      "gpt-4o",
+    );
   });
 
   it("rejects invalid provider", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
-    const { exitCode } = run(fakeHome, "config", "set-model", "invalid", "model");
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
+    const { exitCode } = run(
+      fakeHome,
+      "config",
+      "set-model",
+      "invalid",
+      "model",
+    );
     expect(exitCode).toBe(1);
   });
 
   it("errors when no key is configured for the provider", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
     const { exitCode } = run(fakeHome, "config", "set-model", "openai");
     expect(exitCode).toBe(1);
   });
 });
 
-describe("prism config show", () => {
+describe("tracecode config show", () => {
   let fakeHome: string;
 
   afterEach(() => {
@@ -61,7 +85,7 @@ describe("prism config show", () => {
   });
 
   it("shows 'not set' when nothing is configured", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
     const { stdout, exitCode } = run(fakeHome, "config", "show");
     expect(exitCode).toBe(0);
     expect(stdout).toContain("GitHub token:  not set");
@@ -70,8 +94,8 @@ describe("prism config show", () => {
   });
 
   it("shows keys and models when configured", () => {
-    fakeHome = mkdtempSync(join(tmpdir(), "prism-test-home-"));
-    const configDir = join(fakeHome, ".config", "prism");
+    fakeHome = mkdtempSync(join(tmpdir(), "tracecode-test-home-"));
+    const configDir = join(fakeHome, ".config", "tracecode");
 
     mkdirSync(configDir, { recursive: true });
     writeFileSync(join(configDir, "openai-key"), "sk-test\n", { mode: 0o600 });

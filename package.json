@@ -1,12 +1,32 @@
 {
-  "name": "prism-cli",
+  "name": "tracecode",
   "version": "0.1.0",
   "description": "Understand your codebase before you change it. Local-first CLI that indexes git history and code structure to explain why code exists and what a change will break.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "prism": "./dist/cli/index.js"
+    "tracecode": "./dist/cli/index.js"
   },
+  "author": "ayomidade <ayomikesam@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ayomidade/prism.git"
+  },
+  "homepage": "https://github.com/Ayomidade/prism#readme",
+  "bugs": {
+    "url": "https://github.com/Ayomidade/prism/issues"
+  },
+  "keywords": [
+    "cli",
+    "codebase-intelligence",
+    "git",
+    "git-blame",
+    "impact-analysis",
+    "developer-tools",
+    "code-graph",
+    "why",
+    "local-first"
+  ],
   "files": [
     "dist",
     "README.md",

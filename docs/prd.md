@@ -1,5 +1,6 @@
 # Product Requirements Document (PRD)
-## PRISM — Codebase Intelligence Tool
+
+## TRACECODE — Codebase Intelligence Tool
 
 ---
 
@@ -16,7 +17,7 @@ The tool runs locally by default (no code leaves the machine unless the user opt
 
 ## 2. Problem
 
-Developers inheriting or maintaining an existing codebase struggle with two compounding issues: code tells you *what* it does but never *why* it was written that way, and changing shared code requires manually tracing every dependent, which is slow and error-prone. Existing tools solve one of these problems in isolation (git-why, git-unearth for "why"; Nodestradamus, ops-codegraph-tool for "impact") but none combine both on one shared index, and most "why" tools require sending code to a third-party LLM API. See the [Problem Brief](./problem-brief.md) for full research and competitive analysis.
+Developers inheriting or maintaining an existing codebase struggle with two compounding issues: code tells you _what_ it does but never _why_ it was written that way, and changing shared code requires manually tracing every dependent, which is slow and error-prone. Existing tools solve one of these problems in isolation (git-why, git-unearth for "why"; Nodestradamus, ops-codegraph-tool for "impact") but none combine both on one shared index, and most "why" tools require sending code to a third-party LLM API. See the [Problem Brief](./problem-brief.md) for full research and competitive analysis.
 
 ---
 
@@ -51,18 +52,21 @@ Developers inheriting or maintaining an existing codebase struggle with two comp
 ## 6. Core Workflows
 
 **Workflow A — Ingest a repo**
-1. Developer runs `prism init` inside a git repo
+
+1. Developer runs `tracecode init` inside a git repo
 2. Tool parses git log/blame locally, builds a code structure graph (imports/exports/calls), optionally pulls linked PRs/issues via GitHub API
 3. Tool stores the graph locally (e.g. SQLite) for fast repeat queries
 
 **Workflow B — "Why does this exist"**
-1. Developer runs `prism why <file>:<line>` or `prism why --function <name>`
+
+1. Developer runs `tracecode why <file>:<line>` or `tracecode why --function <name>`
 2. Tool retrieves commit history for that code region from the graph
 3. Tool summarizes commit messages + linked PR/issue text into a short explanation, tagged with a confidence level
 4. Output printed to terminal (or `--json`)
 
 **Workflow C — "What will this break"**
-1. Developer runs `prism impact <symbol>`
+
+1. Developer runs `tracecode impact <symbol>`
 2. Tool queries the dependency graph for direct and indirect callers/importers
 3. Tool prints a tree of affected files/functions/tests, optionally exports as HTML
 
@@ -85,17 +89,20 @@ Developers inheriting or maintaining an existing codebase struggle with two comp
 ## 8. MVP Features
 
 🔴 **Must have**
+
 - `init` command: local git + code structure ingestion
 - `why` command: commit history + PR/issue summary
 - `impact` command: dependency/usage graph query
 - Readable terminal output
 
 🟡 **Should have**
+
 - Confidence indicator on `why` output
 - HTML export for `impact` results
 - `--json` output mode
 
 🟢 **Nice to have**
+
 - GitHub Action / PR comment integration
 - VS Code extension
 - Environment/setup diagnostics ("why doesn't this run")
@@ -109,7 +116,7 @@ Developers inheriting or maintaining an existing codebase struggle with two comp
 - **Privacy:** No code or history leaves the local machine unless the user explicitly enables a remote AI summarization feature
 - **Portability:** Works cross-platform (macOS, Linux, Windows) via Node.js
 - **Reliability:** Ingestion must not crash on malformed/partial git histories; fails gracefully with a clear error
-- **Usability:** Zero-config default (`npx prism init` and go); no required setup beyond having git installed
+- **Usability:** Zero-config default (`npx tracecode init` and go); no required setup beyond having git installed
 - **Responsiveness:** Any HTML/web report output must be fully responsive across all screen sizes
 
 ---

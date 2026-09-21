@@ -1,25 +1,31 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
 // Local storage for optional tokens: GitHub API token + per-AI-provider
-// keys. Falls back to a local config file in ~/.config/prism/. Never logs
+// keys. Falls back to a local config file in ~/.config/tracecode/. Never logs
 // or embeds a raw token in any output.
 // See docs/technical-architecture.md Section 5 (Authentication) and
 // Section 10 (Security Considerations).
 
-const CONFIG_DIR = join(homedir(), ".config", "prism");
+const CONFIG_DIR = join(homedir(), ".config", "tracecode");
 const TOKEN_FILE = join(CONFIG_DIR, "token");
 
 /**
  * Reads the GitHub token. Checks (in order):
- *   1. PRISM_GITHUB_TOKEN env var
- *   2. ~/.config/prism/token file
+ *   1. TRACECODE_GITHUB_TOKEN env var
+ *   2. ~/.config/tracecode/token file
  *
  * @returns The token string, or undefined if not configured
  */
 export function getGitHubToken(): string | undefined {
-  const envToken = process.env.PRISM_GITHUB_TOKEN;
+  const envToken = process.env.TRACECODE_GITHUB_TOKEN;
   if (envToken) return envToken;
 
   if (existsSync(TOKEN_FILE)) {
@@ -34,7 +40,7 @@ export function getGitHubToken(): string | undefined {
 }
 
 /**
- * Stores the GitHub token to ~/.config/prism/token.
+ * Stores the GitHub token to ~/.config/tracecode/token.
  * Creates the config directory if it doesn't exist.
  */
 export function setGitHubToken(token: string): void {
@@ -44,14 +50,14 @@ export function setGitHubToken(token: string): void {
 
 /**
  * Reads an AI provider's key. Checks (in order):
- *   1. PRISM_<PROVIDER>_KEY env var (e.g. PRISM_OPENAI_KEY, PRISM_GEMINI_KEY)
- *   2. ~/.config/prism/<provider>-key file
+ *   1. TRACECODE_<PROVIDER>_KEY env var (e.g. TRACECODE_OPENAI_KEY, TRACECODE_GEMINI_KEY)
+ *   2. ~/.config/tracecode/<provider>-key file
  *
  * Generalizes what was previously a single hardcoded getAnthropicKey() —
  * same lookup pattern, parametrized by provider id.
  */
 export function getProviderKey(providerId: string): string | undefined {
-  const envVar = `PRISM_${providerId.toUpperCase()}_KEY`;
+  const envVar = `TRACECODE_${providerId.toUpperCase()}_KEY`;
   const envKey = process.env[envVar];
   if (envKey) return envKey;
 
@@ -68,23 +74,25 @@ export function getProviderKey(providerId: string): string | undefined {
 }
 
 /**
- * Stores an AI provider's key to ~/.config/prism/<provider>-key.
+ * Stores an AI provider's key to ~/.config/tracecode/<provider>-key.
  * Creates the config directory if it doesn't exist.
  */
 export function setProviderKey(providerId: string, key: string): void {
   mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(join(CONFIG_DIR, `${providerId}-key`), key + "\n", { mode: 0o600 });
+  writeFileSync(join(CONFIG_DIR, `${providerId}-key`), key + "\n", {
+    mode: 0o600,
+  });
 }
 
 /**
  * Reads the model override for an AI provider. Checks (in order):
- *   1. PRISM_AI_MODEL env var (global override, backwards-compatible)
- *   2. ~/.config/prism/<provider>-model file
+ *   1. TRACECODE_AI_MODEL env var (global override, backwards-compatible)
+ *   2. ~/.config/tracecode/<provider>-model file
  *
  * @returns The model string, or undefined if not configured (caller should use default)
  */
 export function getModel(providerId: string): string | undefined {
-  const envModel = process.env.PRISM_AI_MODEL;
+  const envModel = process.env.TRACECODE_AI_MODEL;
   if (envModel) return envModel;
 
   const modelFile = join(CONFIG_DIR, `${providerId}-model`);
@@ -100,16 +108,18 @@ export function getModel(providerId: string): string | undefined {
 }
 
 /**
- * Stores a model override for an AI provider to ~/.config/prism/<provider>-model.
+ * Stores a model override for an AI provider to ~/.config/tracecode/<provider>-model.
  * Creates the config directory if it doesn't exist.
  */
 export function setModel(providerId: string, model: string): void {
   mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(join(CONFIG_DIR, `${providerId}-model`), model + "\n", { mode: 0o600 });
+  writeFileSync(join(CONFIG_DIR, `${providerId}-model`), model + "\n", {
+    mode: 0o600,
+  });
 }
 
 /**
- * Returns the full configuration state for display in `prism config show`.
+ * Returns the full configuration state for display in `tracecode config show`.
  * Does NOT return sensitive values (keys/tokens) — only whether they exist.
  */
 export function listConfig(): {
@@ -118,16 +128,18 @@ export function listConfig(): {
 } {
   return {
     githubToken: !!getGitHubToken(),
-    providers: ["anthropic", "openai", "gemini", "groq", "custom"].map((id) => ({
-      id,
-      keySet: !!getProviderKey(id),
-      model: getModel(id),
-    })),
+    providers: ["anthropic", "openai", "gemini", "groq", "custom"].map(
+      (id) => ({
+        id,
+        keySet: !!getProviderKey(id),
+        model: getModel(id),
+      }),
+    ),
   };
 }
 
 /**
- * Removes an AI provider's key file from ~/.config/prism/.
+ * Removes an AI provider's key file from ~/.config/tracecode/.
  * Returns true if a file was deleted, false if no file existed.
  */
 export function removeProviderKey(providerId: string): boolean {
@@ -140,7 +152,7 @@ export function removeProviderKey(providerId: string): boolean {
 }
 
 /**
- * Removes the GitHub token file from ~/.config/prism/.
+ * Removes the GitHub token file from ~/.config/tracecode/.
  * Returns true if a file was deleted, false if no file existed.
  */
 export function removeGitHubToken(): boolean {
@@ -169,7 +181,7 @@ export function getActiveProvider(): string | undefined {
 }
 
 /**
- * Persists the active provider preference to ~/.config/prism/active-provider.
+ * Persists the active provider preference to ~/.config/tracecode/active-provider.
  * Creates the config directory if it doesn't exist.
  */
 export function setActiveProvider(providerId: string): void {

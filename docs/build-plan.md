@@ -1,5 +1,6 @@
 # Build Plan (Historical)
-## PRISM — Codebase Intelligence Tool
+
+## TRACECODE — Codebase Intelligence Tool
 
 > **Status:** This build plan is preserved for reference. All three phases are complete.
 > See `linking.md` for the actual build log of what shipped.
@@ -91,7 +92,7 @@ Day 11
 │
 Day 12
 ├── Deployment & demo
-│   ├── Publish to npm (`npx prism`)
+│   ├── Publish to npm (`npx tracecode`)
 │   ├── Write README with install + usage examples
 │   ├── Record a short demo (terminal + HTML report)
 │   └── Portfolio write-up: problem → research → build → outcome

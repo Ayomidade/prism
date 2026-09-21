@@ -1,11 +1,11 @@
-# PRISM
+# TRACECODE
 
 **Understand your codebase before you change it.**
 
-A local-first CLI for JS/TS developers. PRISM indexes your repo's git history and code structure, then answers two questions straight from your terminal:
+A local-first CLI for JS/TS developers. TRACECODE indexes your repo's git history and code structure, then answers two questions straight from your terminal:
 
-- **`prism why <file>:<line>`** — why does this code exist?
-- **`prism impact <symbol>`** — what will changing this break?
+- **`tracecode why <file>:<line>`** — why does this code exist?
+- **`tracecode impact <symbol>`** — what will changing this break?
 
 No code leaves your machine. No server, no account, no cloud dependency required.
 
@@ -14,22 +14,22 @@ No code leaves your machine. No server, no account, no cloud dependency required
 ## Install
 
 ```bash
-npm install -g prism-cli
+npm install -g tracecode
 ```
 
 Or run without installing:
 
 ```bash
-npx prism-cli <command>
+npx tracecode <command>
 ```
 
 ## Quick Start
 
 ```bash
 cd my-project
-prism init                          # index the repo
-prism why src/db.ts:42              # explain why this code exists
-prism impact openDatabase           # see what would break
+tracecode init                          # index the repo
+tracecode why src/db.ts:42              # explain why this code exists
+tracecode impact openDatabase           # see what would break
 ```
 
 **Full usage guide:** [`docs/usage.md`](./docs/usage.md) — all commands, flags, AI provider setup, GitHub enrichment, output formats, and troubleshooting.
@@ -38,12 +38,12 @@ prism impact openDatabase           # see what would break
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `prism init` | Index the repository (git history + code structure) |
-| `prism why <file>:<line>` | Explain why a piece of code exists |
-| `prism impact <symbol>` | Show what could break if a symbol changes |
-| `prism config set-key <target> <key>` | Store API keys and tokens locally |
+| Command                                   | Description                                         |
+| ----------------------------------------- | --------------------------------------------------- |
+| `tracecode init`                          | Index the repository (git history + code structure) |
+| `tracecode why <file>:<line>`             | Explain why a piece of code exists                  |
+| `tracecode impact <symbol>`               | Show what could break if a symbol changes           |
+| `tracecode config set-key <target> <key>` | Store API keys and tokens locally                   |
 
 ---
 

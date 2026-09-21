@@ -4,22 +4,22 @@ import { dirname, join } from "node:path";
 import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema.js";
 
 // ──────────────────────────────────────────────────────────────────────────────
-// db.ts — SQLite connection and initialization for .prism/graph.db
+// db.ts — SQLite connection and initialization for .tracecode/graph.db
 // ──────────────────────────────────────────────────────────────────────────────
 //
-// This is the database layer for PRISM. Every other module (graph/, ingestion/,
+// This is the database layer for TRACECODE. Every other module (graph/, ingestion/,
 // summarize/) reads from or writes to the SQLite database that this module
 // manages.
 //
 // Responsibilities:
-//   1. Create the .prism/ directory if it doesn't exist (fresh repo).
+//   1. Create the .tracecode/ directory if it doesn't exist (fresh repo).
 //   2. Open/create the SQLite database file.
 //   3. Apply the schema (idempotent CREATE TABLE IF NOT EXISTS).
 //   4. Check and enforce schema versioning so stale caches fail loudly.
 //
 // How it fits into the data flow:
 //
-//   prism init
+//   tracecode init
 //       │
 //       ├── git log/blame ──► ingestion/git/
 //       ├── AST parse     ──► graph/parser.ts
@@ -29,9 +29,9 @@ import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema.js";
 //   db.ts ──► openDatabase(dbPath)
 //              │
 //              ▼
-//         .prism/graph.db  (all data lives here)
+//         .tracecode/graph.db  (all data lives here)
 //              │
-//   prism why / prism impact
+//   tracecode why / tracecode impact
 //              │
 //              ▼
 //         graph/query.ts reads from the same db
@@ -46,32 +46,32 @@ import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema.js";
 
 /**
  * Returns the default path for the SQLite database inside a repo.
- * Creates a path like `/path/to/repo/.prism/graph.db`.
+ * Creates a path like `/path/to/repo/.tracecode/graph.db`.
  *
  * @param repoRoot - The absolute path to the git repository root
  * @returns The full path to the SQLite database file
  */
 export function getDbPath(repoRoot: string): string {
-  return join(repoRoot, ".prism", "graph.db");
+  return join(repoRoot, ".tracecode", "graph.db");
 }
 
 /**
  * Opens (or creates) the SQLite database at the given path.
  *
  * Steps:
- *   1. Ensures the parent directory exists (creates .prism/ if needed).
+ *   1. Ensures the parent directory exists (creates .tracecode/ if needed).
  *   2. Opens the database with WAL mode and foreign keys enabled.
  *   3. Runs the schema DDL (idempotent — CREATE TABLE IF NOT EXISTS).
  *   4. Checks the stored schema version against the current SCHEMA_VERSION.
  *      - If fresh DB: stamps it with the current version.
  *      - If version mismatch: closes db and throws an actionable error.
  *
- * @param dbPath - Absolute path to the .prism/graph.db file
+ * @param dbPath - Absolute path to the .tracecode/graph.db file
  * @returns An open Database connection ready for use
  * @throws If the stored schema version doesn't match the code's expected version
  */
 export function openDatabase(dbPath: string): Database.Database {
-  // .prism/ may not exist on a fresh repo — create the parent directory first
+  // .tracecode/ may not exist on a fresh repo — create the parent directory first
   // so better-sqlite3 doesn't fail trying to open a file in a non-existent dir.
   const dir = dirname(dbPath);
   if (!existsSync(dir)) {
@@ -113,8 +113,8 @@ export function openDatabase(dbPath: string): Database.Database {
     // process teardown (see Troubleshooting in docs/usage.md). Let the
     // process exit naturally after the throw instead.
     throw new Error(
-      `PRISM database schema is out of date (found v${storedVersion}, expected v${SCHEMA_VERSION}). ` +
-        `Run "prism init --refresh" to rebuild the index.`,
+      `TRACECODE database schema is out of date (found v${storedVersion}, expected v${SCHEMA_VERSION}). ` +
+        `Run "tracecode init --refresh" to rebuild the index.`,
     );
   }
 
@@ -169,7 +169,9 @@ function deduplicateEdges(db: Database.Database): void {
 
   // Check if the unique index already exists (no dedup needed)
   const indexExists = db
-    .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_edges_dedup'")
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_edges_dedup'",
+    )
     .get();
   if (indexExists) return;
 
@@ -187,7 +189,9 @@ function deduplicateEdges(db: Database.Database): void {
  */
 function deduplicateSymbols(db: Database.Database): void {
   const tableExists = db
-    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='symbols'")
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='symbols'",
+    )
     .get();
   if (!tableExists) return;
 

@@ -3,7 +3,7 @@ import { Project, SyntaxKind } from "ts-morph";
 
 // AST-based parsing of JS/TS files to extract symbols (functions, classes,
 // exports) and import relationships. See docs/technical-architecture.md
-// Section 2 and docs/prism-v1-build-spec.md Section 4.
+// Section 2 and docs/tracecode-v1-build-spec.md Section 4.
 
 export interface ParsedSymbol {
   name: string;
@@ -32,7 +32,10 @@ export interface ParsedFile {
   moduleCallbackRefs: string[]; // callback refs in top-level code
 }
 
-export function parseSourceFile(project: Project, filePath: string): ParsedFile {
+export function parseSourceFile(
+  project: Project,
+  filePath: string,
+): ParsedFile {
   const sourceFile = project.getSourceFileOrThrow(filePath);
 
   const symbols: ParsedSymbol[] = [];
@@ -150,7 +153,9 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
     // Type-only imports are excluded — they don't exist at runtime.
     if (importDecl.isTypeOnly()) continue;
 
-    const names: string[] = importDecl.getNamedImports().map((n) => n.getName());
+    const names: string[] = importDecl
+      .getNamedImports()
+      .map((n) => n.getName());
 
     // Default imports resolve the same way — needed for JSX, since
     // React components are almost always default-imported.
@@ -210,7 +215,9 @@ export function parseSourceFile(project: Project, filePath: string): ParsedFile 
  * type-checker-backed resolution to do correctly, which is out of
  * scope for v1.
  */
-function collectCalls(node: { forEachDescendant: (cb: (child: any) => void) => void }): string[] {
+function collectCalls(node: {
+  forEachDescendant: (cb: (child: any) => void) => void;
+}): string[] {
   const calls: string[] = [];
   node.forEachDescendant((child: any) => {
     if (child.getKind() === SyntaxKind.CallExpression) {
@@ -228,7 +235,10 @@ function collectCalls(node: { forEachDescendant: (cb: (child: any) => void) => v
 
     // JSX component references: <Foo /> or <Foo>...</Foo>
     // Capitalized tag names indicate components, not HTML elements.
-    if (child.getKind() === SyntaxKind.JsxSelfClosingElement || child.getKind() === SyntaxKind.JsxOpeningElement) {
+    if (
+      child.getKind() === SyntaxKind.JsxSelfClosingElement ||
+      child.getKind() === SyntaxKind.JsxOpeningElement
+    ) {
       const tagName = child.getTagNameNode?.()?.getText?.();
       if (tagName && /^[A-Z]/.test(tagName)) {
         calls.push(tagName);
@@ -250,7 +260,9 @@ function collectCalls(node: { forEachDescendant: (cb: (child: any) => void) => v
  * Nested call expressions (e.g. authorize("admin")) are already captured by
  * collectCalls as callee-position calls.
  */
-function collectCallbackRefs(node: { forEachDescendant: (cb: (child: any) => void) => void }): string[] {
+function collectCallbackRefs(node: {
+  forEachDescendant: (cb: (child: any) => void) => void;
+}): string[] {
   const refs: string[] = [];
   node.forEachDescendant((child: any) => {
     if (child.getKind() === SyntaxKind.CallExpression) {
@@ -276,7 +288,10 @@ function collectCallbackRefs(node: { forEachDescendant: (cb: (child: any) => voi
  * Returns imports (relative paths) and namedImports (for call resolution).
  * Skips non-relative requires (external packages like 'express', 'lodash').
  */
-function collectRequireImports(sourceFile: any): { imports: string[]; namedImports: NamedImport[] } {
+function collectRequireImports(sourceFile: any): {
+  imports: string[];
+  namedImports: NamedImport[];
+} {
   const imports: string[] = [];
   const namedImports: NamedImport[] = [];
 
@@ -294,7 +309,9 @@ function collectRequireImports(sourceFile: any): { imports: string[]; namedImpor
     const firstArg = args[0];
     if (firstArg.getKind() !== SyntaxKind.StringLiteral) return;
 
-    const specifier = firstArg.asKindOrThrow(SyntaxKind.StringLiteral).getLiteralValue();
+    const specifier = firstArg
+      .asKindOrThrow(SyntaxKind.StringLiteral)
+      .getLiteralValue();
     if (!specifier.startsWith(".")) return;
 
     imports.push(specifier);
@@ -305,8 +322,12 @@ function collectRequireImports(sourceFile: any): { imports: string[]; namedImpor
       const varDecl = parent.asKindOrThrow(SyntaxKind.VariableDeclaration);
       const binding = varDecl.getNameNode();
       if (binding.getKind() === SyntaxKind.ObjectBindingPattern) {
-        const bindingPattern = binding.asKindOrThrow(SyntaxKind.ObjectBindingPattern);
-        const names = bindingPattern.getElements().map((el: any) => el.getName());
+        const bindingPattern = binding.asKindOrThrow(
+          SyntaxKind.ObjectBindingPattern,
+        );
+        const names = bindingPattern
+          .getElements()
+          .map((el: any) => el.getName());
         if (names.length > 0) {
           namedImports.push({ source: specifier, names });
         }

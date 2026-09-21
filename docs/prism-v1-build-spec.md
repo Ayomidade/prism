@@ -1,4 +1,4 @@
-# PRISM v1 — Build Specification
+# TRACECODE v1 — Build Specification
 
 This turns the PRD + Technical Architecture into the exact implementation contract for the frozen MVP (see `mvp-contract.md`): three commands, local-only by default, no AI or HTML export required to ship.
 
@@ -7,7 +7,7 @@ This turns the PRD + Technical Architecture into the exact implementation contra
 ## 1. Folder Structure
 
 ```
-prism/
+tracecode/
 ├── src/
 │   ├── cli/
 │   │   ├── index.ts              # CLI entry point, command registration
@@ -58,15 +58,15 @@ prism/
 
 ## 2. Packages / Dependencies
 
-| Purpose | Package |
-|---|---|
-| CLI framework | `commander` |
-| AST parsing | `ts-morph` |
-| SQLite | `better-sqlite3` |
-| Terminal formatting | `chalk` (color), `cli-table3` or custom tree renderer |
-| GitHub API (optional) | `@octokit/rest` |
-| Testing | `vitest` |
-| Build/bundling | `tsup` or `esbuild` for a single-file CLI binary |
+| Purpose               | Package                                               |
+| --------------------- | ----------------------------------------------------- |
+| CLI framework         | `commander`                                           |
+| AST parsing           | `ts-morph`                                            |
+| SQLite                | `better-sqlite3`                                      |
+| Terminal formatting   | `chalk` (color), `cli-table3` or custom tree renderer |
+| GitHub API (optional) | `@octokit/rest`                                       |
+| Testing               | `vitest`                                              |
+| Build/bundling        | `tsup` or `esbuild` for a single-file CLI binary      |
 
 No AI SDK is a required dependency for v1 — the Anthropic SDK is deferred to the fast-follow AI summarization feature and is not part of the v1 dependency tree.
 
@@ -148,7 +148,7 @@ CREATE TABLE meta (
 
 - **Node types:** `File`, `Symbol` (function/class/export/variable)
 - **Edge types:** `imports` (file → file), `calls` (symbol → symbol), `extends` (class → class)
-- **Directionality:** edges point from the *dependent* to the *dependency* (A imports B → edge A→B). `impact` queries traverse edges in reverse (who points *to* this symbol) to find dependents.
+- **Directionality:** edges point from the _dependent_ to the _dependency_ (A imports B → edge A→B). `impact` queries traverse edges in reverse (who points _to_ this symbol) to find dependents.
 - **Traversal for `impact`:** breadth-first from the target symbol, following reverse edges, capped at a configurable depth (default: unlimited, but de-duplicated to avoid cycles)
 - **Traversal for `why`:** not a graph traversal — a direct lookup of `commit_files` rows overlapping the given file/line range, joined to `commits` and (optionally) `pr_issue_links`
 
@@ -156,35 +156,41 @@ CREATE TABLE meta (
 
 ## 5. CLI Commands (exact contract)
 
-### `prism init`
+### `tracecode init`
+
 ```
-prism init [--refresh]
+tracecode init [--refresh]
 ```
+
 - Detects git repo root, fails clearly if not inside one
 - Parses full git log/blame history
 - Parses all `.js/.ts/.jsx/.tsx` files via AST into the graph
 - If a GitHub token is configured, fetches linked PR/issue data for recent commits
-- Writes everything to `.prism/graph.db`
+- Writes everything to `.tracecode/graph.db`
 - `--refresh` forces a full re-index instead of using the existing cache
 
-### `prism why`
+### `tracecode why`
+
 ```
-prism why <file>:<line>
-prism why --function <name>
-prism why <file>:<line> --json
+tracecode why <file>:<line>
+tracecode why --function <name>
+tracecode why <file>:<line> --json
 ```
+
 - Resolves the target symbol/line range
 - Looks up overlapping commits, ordered most-recent first
 - If PR/issue data exists for those commits, includes it
 - Builds a template-based summary (default) tagged `confidence: documented`
 - Fails clearly with "no significant history" if the code is new/unindexed, rather than fabricating an answer
 
-### `prism impact`
+### `tracecode impact`
+
 ```
-prism impact <symbol>
-prism impact <file>:<symbol>
-prism impact <symbol> --json
+tracecode impact <symbol>
+tracecode impact <file>:<symbol>
+tracecode impact <symbol> --json
 ```
+
 - Resolves the symbol (disambiguates by file path if the name is ambiguous, prompts if still unclear)
 - Traverses the reverse dependency graph
 - Outputs a tree: direct dependents first, then transitive, grouped by file
@@ -216,17 +222,17 @@ Incremental re-index (`--refresh` without full rebuild, post-v1 optimization): c
 
 ## 8. Error Handling
 
-| Condition | Behavior |
-|---|---|
-| Not inside a git repo | Clear error, exit non-zero, no partial `.prism/` created |
-| Shallow clone (limited history) | Warn that history is incomplete, proceed with what's available |
-| No GitHub token configured | Silently skip PR/issue enrichment, `why` still works from commit messages alone |
-| GitHub API rate-limited/unauthorized | Warn once, skip enrichment for remainder of run, don't fail the whole `init` |
-| Symbol not found (`why`/`impact`) | Clear "not found" message, suggest closest match if available |
-| Ambiguous symbol name | List all matches with file paths, ask user to specify one |
-| Corrupt/missing `.prism/graph.db` | Detect on command run, instruct user to re-run `prism init` |
-| Schema version mismatch (upgraded PRISM version) | Detect via `meta`, instruct user to re-run `prism init --refresh` |
-| Very large repo (10k+ files) | No hard failure required for v1; acceptable to be slow. Performance optimization is post-v1, not blocking |
+| Condition                                            | Behavior                                                                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Not inside a git repo                                | Clear error, exit non-zero, no partial `.tracecode/` created                                              |
+| Shallow clone (limited history)                      | Warn that history is incomplete, proceed with what's available                                            |
+| No GitHub token configured                           | Silently skip PR/issue enrichment, `why` still works from commit messages alone                           |
+| GitHub API rate-limited/unauthorized                 | Warn once, skip enrichment for remainder of run, don't fail the whole `init`                              |
+| Symbol not found (`why`/`impact`)                    | Clear "not found" message, suggest closest match if available                                             |
+| Ambiguous symbol name                                | List all matches with file paths, ask user to specify one                                                 |
+| Corrupt/missing `.tracecode/graph.db`                | Detect on command run, instruct user to re-run `tracecode init`                                           |
+| Schema version mismatch (upgraded TRACECODE version) | Detect via `meta`, instruct user to re-run `tracecode init --refresh`                                     |
+| Very large repo (10k+ files)                         | No hard failure required for v1; acceptable to be slow. Performance optimization is post-v1, not blocking |
 
 ---
 
@@ -237,9 +243,9 @@ This follows the existing `build-plan.md` phases, restated as an implementation 
 1. **SQLite schema + connection layer** (`store/schema.ts`, `store/db.ts`) — everything else depends on this existing first
 2. **Git log/blame parsing** (`ingestion/git/`) — no dependency on the graph, can be built and tested standalone
 3. **AST parsing + graph construction** (`graph/parser.ts`, `graph/build-graph.ts`) — depends on schema, not on git ingestion
-4. **`prism init` command** — wires ingestion + graph construction + storage together, first fully working command
-5. **`prism why` command** — depends on `init` having populated `commit_files`
-6. **`prism impact` command** — depends on `init` having populated `edges`
+4. **`tracecode init` command** — wires ingestion + graph construction + storage together, first fully working command
+5. **`tracecode why` command** — depends on `init` having populated `commit_files`
+6. **`tracecode impact` command** — depends on `init` having populated `edges`
 7. **GitHub API enrichment** — bolted onto `init`, additive, doesn't block 4-6 from working without it
 8. **Error handling pass** — applied across all commands once the happy path works
 9. **Testing against real repos** — validates the whole pipeline end to end

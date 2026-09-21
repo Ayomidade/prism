@@ -27,15 +27,19 @@ function runScript(name: string): { cmd: string; scriptArgs: string[] } {
  * @param dbPath   - Path to the SQLite database file
  */
 export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
-  // 1. Create .prism directory
-  mkdirSync(join(repoRoot, ".prism"), { recursive: true });
+  // 1. Create .tracecode directory
+  mkdirSync(join(repoRoot, ".tracecode"), { recursive: true });
 
   // 1a. Check for shallow clone
   try {
-    const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
-      encoding: "utf-8",
-      cwd: repoRoot,
-    }).trim();
+    const shallow = execFileSync(
+      "git",
+      ["rev-parse", "--is-shallow-repository"],
+      {
+        encoding: "utf-8",
+        cwd: repoRoot,
+      },
+    ).trim();
     if (shallow === "true") {
       console.log("  Warning: This is a shallow clone. History is incomplete.");
     }
@@ -59,7 +63,10 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
 
   // 4. Git blame (no DB needed — collect data in memory)
   console.log("  Running git blame...");
-  const fileBlames: Array<{ path: string; blame: Array<{ commitSha: string; line: number }> }> = [];
+  const fileBlames: Array<{
+    path: string;
+    blame: Array<{ commitSha: string; line: number }>;
+  }> = [];
   for (const filePath of trackedFiles) {
     try {
       const blame = await parseGitBlame(repoRoot, filePath);
@@ -83,13 +90,15 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
   const gitData = JSON.stringify({ commits, files: fileBlames });
   try {
     const { cmd, scriptArgs } = runScript("db-write");
-    const result = execFileSync(
-      cmd,
-      [...scriptArgs, dbPath],
-      { input: gitData, cwd: repoRoot, encoding: "utf-8" }
-    );
+    const result = execFileSync(cmd, [...scriptArgs, dbPath], {
+      input: gitData,
+      cwd: repoRoot,
+      encoding: "utf-8",
+    });
     const counts = JSON.parse(result);
-    console.log(`    ${counts.commits} commits, ${counts.files} files, ${counts.commit_files} commit_files`);
+    console.log(
+      `    ${counts.commits} commits, ${counts.files} files, ${counts.commit_files} commit_files`,
+    );
   } catch (err: any) {
     // better-sqlite3 crashes during process teardown with a non-zero exit code,
     // but the data was written before the crash. Verify the DB exists and has data.
@@ -104,14 +113,14 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
   // 6. AST parsing (child process — ts-morph only)
   console.log("  Parsing AST...");
   const fileList = trackedFiles.join("\n");
-  const parsedJson = join(repoRoot, ".prism", "parsed.json");
+  const parsedJson = join(repoRoot, ".tracecode", "parsed.json");
   try {
     const { cmd, scriptArgs } = runScript("ast-parse");
-    execFileSync(
-      cmd,
-      [...scriptArgs, repoRoot, parsedJson],
-      { input: fileList, cwd: repoRoot, encoding: "utf-8" }
-    );
+    execFileSync(cmd, [...scriptArgs, repoRoot, parsedJson], {
+      input: fileList,
+      cwd: repoRoot,
+      encoding: "utf-8",
+    });
   } catch (err: any) {
     console.error(`  Warning: AST parsing failed: ${err.message}`);
   }
@@ -124,7 +133,7 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
       const result = execFileSync(
         cmd,
         [...scriptArgs, repoRoot, parsedJson, dbPath],
-        { cwd: repoRoot, encoding: "utf-8" }
+        { cwd: repoRoot, encoding: "utf-8" },
       );
       process.stdout.write(`    ${result.trim()}\n`);
     } catch (err: any) {
@@ -139,11 +148,11 @@ export async function runInit(repoRoot: string, dbPath: string): Promise<void> {
     try {
       const shas = JSON.stringify(commits.map((c) => c.sha));
       const { cmd, scriptArgs } = runScript("github-fetch");
-      execFileSync(
-        cmd,
-        [...scriptArgs, dbPath],
-        { input: shas, cwd: repoRoot, encoding: "utf-8" }
-      );
+      execFileSync(cmd, [...scriptArgs, dbPath], {
+        input: shas,
+        cwd: repoRoot,
+        encoding: "utf-8",
+      });
     } catch {
       console.log("    Skipped (no GitHub token or API error)");
     }
@@ -154,12 +163,17 @@ export function registerInitCommand(program: Command): void {
   program
     .command("init")
     .description("Index the current repository (git history + code structure)")
-    .option("--refresh", "Force a full re-index instead of using the existing cache")
+    .option(
+      "--refresh",
+      "Force a full re-index instead of using the existing cache",
+    )
     .action(async (options: { refresh?: boolean }) => {
       // Verify we're in a git repo
       let repoRoot: string;
       try {
-        repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+        repoRoot = execSync("git rev-parse --show-toplevel", {
+          encoding: "utf-8",
+        }).trim();
       } catch {
         console.error("Error: Not inside a git repository.");
         process.exit(1);
@@ -167,7 +181,7 @@ export function registerInitCommand(program: Command): void {
 
       console.log(`Indexing ${repoRoot}...`);
 
-      const dbDir = join(repoRoot, ".prism");
+      const dbDir = join(repoRoot, ".tracecode");
       const dbPath = join(dbDir, "graph.db");
 
       // --refresh: delete existing database and parsed data, then rebuild from scratch
@@ -184,4 +198,3 @@ export function registerInitCommand(program: Command): void {
       console.log(`\nDone! Database: ${dbPath}`);
     });
 }
-
